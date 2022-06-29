@@ -11,26 +11,26 @@ import (
 
 type UserManager struct {
 	connections map[*Connection]struct{}
-	nextConnId  uint
+	nextConnId  ConnId
 
-	session2User map[string]uint
-	nextUserId   uint
+	session2User map[Session]UserId
+	nextUserId   UserId
 
 	mu sync.RWMutex
 }
 
 func NewUserManager() *UserManager {
-	return &UserManager{map[*Connection]struct{}{}, 1, map[string]uint{}, 1, sync.RWMutex{}}
+	return &UserManager{map[*Connection]struct{}{}, 1, map[Session]UserId{}, 1, sync.RWMutex{}}
 }
 
-func (users *UserManager) SessionToUserId(session string) uint {
+func (users *UserManager) SessionToUserId(session Session) UserId {
 	users.mu.RLock()
 	defer users.mu.RUnlock()
 	return users.sessionToUserId(session)
 }
 
 // Caller must lock mutex
-func (users *UserManager) sessionToUserId(session string) uint {
+func (users *UserManager) sessionToUserId(session Session) UserId {
 	if userId, ok := users.session2User[session]; ok {
 		return userId
 	}
@@ -41,7 +41,7 @@ func (users *UserManager) sessionToUserId(session string) uint {
 }
 
 // Broadcasts data to everyone but the sender
-func (users *UserManager) BroadcastFrom(packet Packet, sender uint) error {
+func (users *UserManager) BroadcastFrom(packet Packet, sender ConnId) error {
 	users.mu.Lock()
 	defer users.mu.Unlock()
 
@@ -64,7 +64,7 @@ var wsupgrader = websocket.Upgrader{
 
 }
 
-func (users *UserManager) AddConnection(writer http.ResponseWriter, req *http.Request, session string, incomingListener chan *Message) (*Connection, error) {
+func (users *UserManager) AddConnection(writer http.ResponseWriter, req *http.Request, session Session, incomingListener chan *Message) (*Connection, error) {
 	ws, err := wsupgrader.Upgrade(writer, req, nil)
 	if err != nil {
 		return nil, err
@@ -92,6 +92,9 @@ func (users *UserManager) AddConnection(writer http.ResponseWriter, req *http.Re
 			t, msgData, err := ws.ReadMessage()
 			if err != nil {
 				break
+			}
+			if t == websocket.BinaryMessage {
+				log.Printf("warning: received binary message `%s`", msgData)
 			}
 			if t == websocket.TextMessage {
 				if packet, err := decode(msgData); err != nil {

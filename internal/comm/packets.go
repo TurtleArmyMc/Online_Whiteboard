@@ -9,7 +9,7 @@ import (
 
 type Packet interface {
 	// Returns whether or not the packet should be broadcast to other connections
-	Apply(currentCanvas *canvas.Canvas, users *UserManager, sender uint) (bool, error)
+	Apply(currentCanvas *canvas.Canvas, users *UserManager, sender ConnId) (bool, error)
 	encoded() ([]byte, error)
 }
 
@@ -53,7 +53,7 @@ type paintLayerSetPacket struct {
 	Image encodedCanvas `json:"image"`
 }
 
-func (packet *paintLayerSetPacket) Apply(currentCanvas *canvas.Canvas, users *UserManager, sender uint) (bool, error) {
+func (packet *paintLayerSetPacket) Apply(currentCanvas *canvas.Canvas, users *UserManager, sender ConnId) (bool, error) {
 	image, err := packet.Image.decode()
 	if err != nil {
 		return false, err
@@ -68,7 +68,7 @@ func (packet *paintLayerSetPacket) encoded() ([]byte, error) {
 	return json.Marshal(map[string]interface{}{"type": TYPE_PAINT_LAYER_SET, "data": packet})
 }
 
-func NewPaintLayerSetPacket(currentCanvas *canvas.Canvas, sender uint) (Packet, error) {
+func NewPaintLayerSetPacket(currentCanvas *canvas.Canvas) (Packet, error) {
 	return &paintLayerSetPacket{*encodeCanvas(currentCanvas)}, nil
 }
 
@@ -77,7 +77,7 @@ type paintLayerDrawPacket struct {
 	Image encodedCanvas `json:"image"`
 }
 
-func (packet *paintLayerDrawPacket) Apply(currentCanvas *canvas.Canvas, users *UserManager, sender uint) (bool, error) {
+func (packet *paintLayerDrawPacket) Apply(currentCanvas *canvas.Canvas, users *UserManager, sender ConnId) (bool, error) {
 	image, err := packet.Image.decode()
 	if err != nil {
 		return false, err

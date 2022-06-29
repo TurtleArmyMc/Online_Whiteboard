@@ -1,23 +1,25 @@
 /** @type {HTMLCanvasElement} */
-let mainDisplay = document.getElementById("main_display");
-mainDisplay.imageSmoothingEnabled = false;
+var mainDisplay = document.getElementById("main_display");
 
-let url = new URL('/ws', window.location.href);
-url.protocol = url.protocol.replace('http', 'ws');
-let socket = new WebSocket(url.href);
-// socket.binaryType = "arraybuffer";
+/** @type {WebSocket} */
+var socket;
+{
+    let url = new URL('/ws', window.location.href);
+    url.protocol = url.protocol.replace('http', 'ws');
+    socket = new WebSocket(url.href);
+}
+window.onclose = (_) => socket.close();
 
 /**
- * @param {ImageData} imageData
+ * @param {ImageData} image
  * @returns {Object}
  */
-var imageDataToB64 = function (imageData) {
-    // TODO: TEST
-    let d = btoa(String.fromCharCode.apply(null, imageData.data));;
+var imageDataToB64 = function (image) {
+    let imageData = btoa(String.fromCharCode.apply(null, image.data));;
     return {
-        width: imageData.width,
-        height: imageData.height,
-        data: d
+        width: image.width,
+        height: image.height,
+        data: imageData
     };
 }
 
@@ -37,13 +39,15 @@ var b64ToImageData = function (img) {
     );
 }
 
+// Packet types
 const PACKET_PAINT_LAYER_SET = "paint_layer_set";
 const PACKET_PAINT_LAYER_DRAW = "paint_layer_draw";
-var PacketHandler = {
+
+// Handle received packets
+const PacketHandler = {
     /** @argument {Uint8ClampedArray} data */
     [PACKET_PAINT_LAYER_SET]: (data) => {
         let imageData = b64ToImageData(data.image);
-
         let ctx = mainDisplay.getContext("2d");
         ctx.putImageData(imageData, 0, 0);
     },
@@ -51,149 +55,156 @@ var PacketHandler = {
     /** @argument {Uint8ClampedArray} data */
     [PACKET_PAINT_LAYER_DRAW]: (data) => {
         let imageData = b64ToImageData(data.image);
-
         let ctx = mainDisplay.getContext("2d");
         ctx.putImageData(imageData, data.pos.x, data.pos.y);
     },
 }
 
-/** @argument {MessageEvent<string>} e */
+// Reads incoming messages
 socket.onmessage = function (e) {
     let msg = JSON.parse(e.data);
     let t = msg.type;
     let h = PacketHandler[t];
-    h && h(msg.data);
+    if (!!h) {
+        h(msg.data);
+    } else {
+        console.log("error: unknown packet type `" + t + "`");
+    }
 }
 
 /**
- * Used to find a rectangle containing all changed pixels in a paint, and sync
- * only that rectangle to the backend
+ * Used to find a rectangle containing all changed pixels in a paint
  * @property {HTMLCanvasElement} layer
 */
-class PaintLayerEdit {
+class EditBoundTracker {
     /** @argument {HTMLCanvasElement} layer */
     constructor(layer) {
         this.layer = layer;
-        this.prevData = layer.getContext("2d").getImageData(0, 0, layer.width, layer.height);
+        this.prevImage = layer.getContext("2d").getImageData(0, 0, layer.width, layer.height);
     }
 
-    sync = () => {
+    // Find rectangle in which image was changed
+    findEdits = () => {
         let ctx = this.layer.getContext("2d");
-        let currData = ctx.getImageData(0, 0, this.layer.width, this.layer.height);
+        let currImage = ctx.getImageData(0, 0, this.layer.width, this.layer.height);
 
         let maxX = -1;
         let maxY = -1;
         let minX = this.layer.width;
         let minY = this.layer.height;
 
-        let bytesWidth = currData.width * 4;
-        currData.data.forEach((value, inx) => {
-            if (value != this.prevData.data[inx]) {
-                let row = Math.floor(inx / bytesWidth);
-                let col = Math.floor((inx % bytesWidth) / 4);
+        let bytesWidth = currImage.width * 4;
+        let currData = currImage.data;
+        let prevData = this.prevImage.data;
+        for (let i = 0; i < currImage.data.length; i++) {
+            if (currData[i] != prevData[i]) {
+                let row = Math.floor(i / bytesWidth);
+                let col = Math.floor((i % bytesWidth) / 4);
 
                 maxX = Math.max(maxX, col);
                 maxY = Math.max(maxY, row);
                 minX = Math.min(minX, col);
                 minY = Math.min(minY, row);
             }
-        })
+        }
 
         // Check if any changes were found
-        if (maxX == -1) return;
-
-        let width = maxX - minX + 1;
-        let height = maxY - minY + 1;
-        let imgData = ctx.getImageData(minX, minY, width, height);
-
-        let packet = {
-            "type": PACKET_PAINT_LAYER_DRAW,
-            "data": {
-                "pos": { "x": minX, "y": minY },
-                "image": imageDataToB64(imgData),
-            },
-        };
-
-        socket.send(JSON.stringify(packet));
+        if (maxX == -1) return null;
+        return { minX: minX, minY: minY, maxX: maxX, maxY: maxY };
     }
 }
 
-document.getElementById("testFill").onclick = function (e) {
-    console.log("TEST");
-    let edit = new PaintLayerEdit(mainDisplay);
-    let ctx = mainDisplay.getContext("2d");
-    ctx.fillRect(0, 1, 1, 1);
-    edit.sync();
+/**
+ * @param {HTMLCanvasElement} layer
+ * @param {number} minX
+ * @param {number} minY
+ * @param {number} maxX
+ * @param {number} maxY
+*/
+const SyncPaintLayerEdit = function (layer, minX, minY, maxX, maxY) {
+    // Make sure coords are within bounds
+    minX = Math.max(minX, 0);
+    minY = Math.max(minY, 0);
+    maxX = Math.min(maxX, mainDisplay.width - 1);
+    maxY = Math.min(maxY, mainDisplay.height - 1);
+
+    let width = maxX - minX + 1;
+    let height = maxY - minY + 1;
+    let ctx = layer.getContext("2d");
+    let imgData = ctx.getImageData(minX, minY, width, height);
+    let packet = {
+        "type": PACKET_PAINT_LAYER_DRAW,
+        "data": {
+            "pos": { "x": minX, "y": minY },
+            "image": imageDataToB64(imgData),
+        },
+    };
+    socket.send(JSON.stringify(packet));
 }
 
-var PenTool = {
-    drawDot: function (x, y) {
-        this.drawLine(x, y, x, y);
-    },
+// Tools are used to handle how mouse events should affect the canvas
+const Tools = {
+    Pen: {
+        drawDot: function (x, y) {
+            this.drawLine(x, y, x, y);
+        },
 
-    drawLine: function (x1, y1, x2, y2) {
-        let edit = new PaintLayerEdit(mainDisplay);
+        // TODO: Fix short lines appearing jagged
+        drawLine: function (x1, y1, x2, y2) {
+            let ctx = mainDisplay.getContext("2d");
+            // TODO: Allow user to adjust width
+            ctx.lineWidth = 15;
+            ctx.lineCap = "round";
 
-        let ctx = mainDisplay.getContext("2d");
-        ctx.beginPath();
-        ctx.moveTo(x1, y1);
-        ctx.lineWidth = 1;
-        ctx.lineTo(x2, y2);
-        ctx.closePath();
-        ctx.stroke();
+            // Center line on cursor
+            x1 -= Math.ceil(ctx.lineWidth * 0.5);
+            x2 -= Math.ceil(ctx.lineWidth * 0.5);
+            y1 -= Math.ceil(ctx.lineWidth * 0.5);
+            y2 -= Math.ceil(ctx.lineWidth * 0.5);
 
-        edit.sync();
-    },
+            ctx.beginPath();
+            ctx.moveTo(x1, y1);
+            ctx.lineTo(x2, y2);
+            ctx.closePath();
+            ctx.stroke();
 
-    onmousedown: function (e) {
-        this.drawDot(e.clientX, e.clientY);
-    },
+            let minX = Math.min(x1, x2);
+            let minY = Math.min(y1, y2);
+            let maxX = Math.max(x1, x2);
+            let maxY = Math.max(y1, y2);
 
-    onmousemove: function (e, lastX, lastY, mouseDown) {
-        if (mouseDown) {
-            this.drawLine(lastX, lastY, e.clientX, e.clientY);
+            SyncPaintLayerEdit(
+                mainDisplay,
+                minX - ctx.lineWidth - 2,
+                minY - ctx.lineWidth - 2,
+                maxX + ctx.lineWidth + 2,
+                maxY + ctx.lineWidth + 2
+            );
+        },
+
+        onmousedown: function (e) {
+            this.drawDot(e.layerX, e.layerY);
+        },
+
+        onmouseup: function (e) {
+            this.drawDot(e.layerX, e.layerY);
+        },
+
+        /** @param {MouseEvent} e */
+        onmousemove: function (e) {
+            let mouseDown = !!(e.buttons & 1);
+            if (mouseDown) {
+                this.drawLine(e.layerX - e.movementX, e.layerY - e.movementY, e.layerX, e.layerY);
+            }
         }
     }
 }
 
-var CurrentTool = PenTool;
+// The global current tool
+var CurrentTool = Tools.Pen;
 
-var MouseManager = {
-    mouseDown: false,
-    lastX: 0,
-    lastY: 0,
 
-    onmousedown: function (e) {
-        this.lastX = e.clientX;
-        this.lastY = e.clientY;
-        this.mouseDown = true;
-        CurrentTool && CurrentTool.onmousedown && CurrentTool.onmousedown(e);
-    },
-
-    onmouseup: function (e) {
-        this.mouseDown = false;
-        CurrentTool && CurrentTool.onmouseup && CurrentTool.onmouseup(e);
-        this.lastX = e.clientX;
-        this.lastY = e.clientY;
-    },
-
-    onmouseenter: function (e) {
-        CurrentTool && CurrentTool.onmouseenter && CurrentTool.onmouseenter(e);
-    },
-
-    onmouseleave: function (e) {
-        CurrentTool && CurrentTool.onmouseleave && CurrentTool.onmouseleave(e);
-        this.mouseDown = false;
-    },
-
-    onmousemove: function (e) {
-        CurrentTool && CurrentTool.onmousemove && CurrentTool.onmousemove(e, this.lastX, this.lastY, this.mouseDown);
-        this.lastX = e.clientX;
-        this.lastY = e.clientY;
-    },
-}
-
-mainDisplay.onmousedown = MouseManager.onmousedown;
-mainDisplay.onmouseup = MouseManager.onmouseup;
-mainDisplay.onmouseleave = MouseManager.onmouseleave;
-mainDisplay.onmousemove = MouseManager.onmousemove;
+mainDisplay.onmousedown = function (e) { CurrentTool && CurrentTool.onmousedown && CurrentTool.onmousedown(e); };
+mainDisplay.onmouseup = function (e) { CurrentTool && CurrentTool.onmouseup && CurrentTool.onmouseup(e); };
+mainDisplay.onmouseleave = function (e) { CurrentTool && CurrentTool.onmouseleave && CurrentTool.onmouseleave(e); };
+mainDisplay.onmousemove = function (e) { CurrentTool && CurrentTool.onmousemove && CurrentTool.onmousemove(e); };

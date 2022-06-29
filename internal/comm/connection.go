@@ -1,9 +1,11 @@
 package comm
 
+type ConnId uint
+
 type Connection struct {
 	listener chan []byte
-	id       uint
-	userId   uint
+	id       ConnId
+	userId   UserId
 }
 
 func (conn *Connection) Broadcast(packet Packet) error {

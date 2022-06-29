@@ -5,8 +5,10 @@ import (
 	"encoding/base64"
 )
 
-func NewSession() string {
+type Session string
+
+func NewSession() Session {
 	bytes := make([]byte, 8)
 	rand.Read(bytes)
-	return base64.RawURLEncoding.EncodeToString(bytes)
+	return Session(base64.RawURLEncoding.EncodeToString(bytes))
 }

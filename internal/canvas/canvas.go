@@ -14,8 +14,8 @@ type Pos struct {
 }
 
 const (
-	Height = 300
-	Width  = 200
+	Height = 1920
+	Width  = 1080
 )
 
 func NewWhiteCanvas(width, height int) *Canvas {
