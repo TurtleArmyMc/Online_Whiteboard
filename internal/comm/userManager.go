@@ -7,55 +7,71 @@ import (
 
 	"github.com/gorilla/websocket"
 	"github.com/turtlearmy/online-whiteboard/internal/canvas"
+	"github.com/turtlearmy/online-whiteboard/internal/conn"
+	"github.com/turtlearmy/online-whiteboard/internal/packet"
+	"github.com/turtlearmy/online-whiteboard/internal/user"
 )
 
 type UserManager struct {
-	connections map[*Connection]struct{}
-	nextConnId  ConnId
+	connections     map[conn.Id]*conn.Connection
+	connIdGenerator conn.IdGenerator
 
-	session2User map[Session]UserId
-	nextUserId   UserId
+	session2User    map[user.Session]user.Id
+	userIdGenerator user.IdGenerator
 
 	mu sync.RWMutex
 }
 
 func NewUserManager() *UserManager {
-	return &UserManager{map[*Connection]struct{}{}, 1, map[Session]UserId{}, 1, sync.RWMutex{}}
+	return &UserManager{map[conn.Id]*conn.Connection{}, conn.IdGenerator{}, map[user.Session]user.Id{}, user.IdGenerator{}, sync.RWMutex{}}
 }
 
-func (users *UserManager) SessionToUserId(session Session) UserId {
+func (users *UserManager) SessionToUserId(session user.Session) user.Id {
 	users.mu.RLock()
 	defer users.mu.RUnlock()
 	return users.sessionToUserId(session)
 }
 
 // Caller must lock mutex
-func (users *UserManager) sessionToUserId(session Session) UserId {
+func (users *UserManager) sessionToUserId(session user.Session) user.Id {
 	if userId, ok := users.session2User[session]; ok {
 		return userId
 	}
-	userId := users.nextUserId
-	users.nextUserId++
+	userId := users.userIdGenerator.Next()
 	users.session2User[session] = userId
 	return userId
 }
 
 // Broadcasts data to everyone but the sender
-func (users *UserManager) BroadcastFrom(packet Packet, sender ConnId) error {
+func (users *UserManager) BroadcastFrom(packet packet.Packet, sender conn.Id) error {
 	users.mu.Lock()
 	defer users.mu.Unlock()
 
-	encoded, err := packet.encoded()
+	encoded, err := packet.Encoded()
 	if err != nil {
 		return err
 	}
-	for conn := range users.connections {
-		if conn.id != sender {
-			conn.listener <- encoded
+	for id, c := range users.connections {
+		if id != sender {
+			c.Listener <- encoded
 		}
 	}
 
 	return nil
+}
+
+func (users *UserManager) BroadcastTo(packet packet.Packet, receiver *conn.Connection) error {
+	users.mu.Lock()
+	defer users.mu.Unlock()
+
+	encoded, err := packet.Encoded()
+	if err != nil {
+		return err
+	}
+	receiver.Listener <- encoded
+
+	return nil
+
 }
 
 var wsupgrader = websocket.Upgrader{
@@ -64,7 +80,7 @@ var wsupgrader = websocket.Upgrader{
 
 }
 
-func (users *UserManager) AddConnection(writer http.ResponseWriter, req *http.Request, session Session, incomingListener chan *Message) (*Connection, error) {
+func (users *UserManager) AddConnection(writer http.ResponseWriter, req *http.Request, session user.Session, incomingListener chan *Message) (*conn.Connection, error) {
 	ws, err := wsupgrader.Upgrade(writer, req, nil)
 	if err != nil {
 		return nil, err
@@ -73,10 +89,9 @@ func (users *UserManager) AddConnection(writer http.ResponseWriter, req *http.Re
 	outgoingListener := make(chan []byte, 10)
 
 	users.mu.Lock()
-	connId := users.nextConnId
-	users.nextConnId++
-	conn := &Connection{outgoingListener, connId, users.sessionToUserId(session)}
-	users.connections[conn] = struct{}{}
+	connId := users.connIdGenerator.Next()
+	conn := &conn.Connection{Listener: outgoingListener, Id: connId, UserId: users.sessionToUserId(session)}
+	users.connections[connId] = conn
 	users.mu.Unlock()
 
 	// Send outgoing messages
@@ -111,8 +126,8 @@ func (users *UserManager) AddConnection(writer http.ResponseWriter, req *http.Re
 	return conn, nil
 }
 
-func (users *UserManager) removeConnection(connection *Connection) {
+func (users *UserManager) removeConnection(c *conn.Connection) {
 	users.mu.Lock()
-	delete(users.connections, connection)
+	delete(users.connections, c.Id)
 	users.mu.Unlock()
 }

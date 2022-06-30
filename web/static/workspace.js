@@ -157,6 +157,7 @@ const Tools = {
             ctx.lineCap = "round";
 
             // Center line on cursor
+            // FIXME: Does not work well, especially for different line widths
             x1 -= Math.ceil(ctx.lineWidth * 0.5);
             x2 -= Math.ceil(ctx.lineWidth * 0.5);
             y1 -= Math.ceil(ctx.lineWidth * 0.5);

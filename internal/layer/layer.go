@@ -9,7 +9,7 @@ type Layer struct {
 	OwnerId uint
 }
 
-func (layer *Layer) Draw(pos canvas.Pos, src *canvas.Canvas) error {
+func (layer *Layer) Draw(pos canvas.Pos, src canvas.Canvas) error {
 	if err := layer.Canvas.Draw(pos, src); err != nil {
 		return err
 	}

@@ -6,11 +6,13 @@ import (
 
 	"github.com/turtlearmy/online-whiteboard/internal/canvas"
 	"github.com/turtlearmy/online-whiteboard/internal/comm"
+	"github.com/turtlearmy/online-whiteboard/internal/conn"
+	"github.com/turtlearmy/online-whiteboard/internal/user"
 )
 
 type Room struct {
-	currentCanvas    *canvas.Canvas
-	newConnections   chan *comm.Connection
+	currentCanvas    canvas.Canvas
+	newConnections   chan *conn.Connection
 	incomingMessages chan *comm.Message
 	users            *comm.UserManager
 	open             bool
@@ -18,8 +20,8 @@ type Room struct {
 
 func New() *Room {
 	room := &Room{
-		canvas.NewWhiteCanvas(canvas.Height, canvas.Width),
-		make(chan *comm.Connection, 3),
+		canvas.NewWhite(canvas.Height, canvas.Width),
+		make(chan *conn.Connection, 3),
 		make(chan *comm.Message, 20),
 		comm.NewUserManager(),
 		true,
@@ -40,7 +42,7 @@ func (room *Room) handleEvents() {
 				}
 			}
 		case msg := <-room.incomingMessages:
-			broadcast, err := msg.Packet.Apply(room.currentCanvas, room.users, msg.Sender)
+			broadcast, err := msg.Packet.Apply(room.currentCanvas, msg.Sender)
 			if err != nil {
 				log.Printf("error applying packet: %v\n", err)
 			}
@@ -51,18 +53,18 @@ func (room *Room) handleEvents() {
 	}
 }
 
-func (room *Room) setupNewConnection(conn *comm.Connection) error {
+func (room *Room) setupNewConnection(c *conn.Connection) error {
 	packet, err := comm.NewPaintLayerSetPacket(room.currentCanvas)
 	if err != nil {
 		return err
 	}
-	if err := conn.Broadcast(packet); err != nil {
+	if err := room.users.BroadcastTo(packet, c); err != nil {
 		return err
 	}
 	return nil
 }
 
-func (room *Room) WsHandler(writer http.ResponseWriter, req *http.Request, session comm.Session) {
+func (room *Room) WsHandler(writer http.ResponseWriter, req *http.Request, session user.Session) {
 	conn, err := room.users.AddConnection(writer, req, session, room.incomingMessages)
 	if err != nil {
 		log.Printf("error adding websocket connection: %v\n", err)

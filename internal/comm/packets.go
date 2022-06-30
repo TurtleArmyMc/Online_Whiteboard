@@ -5,13 +5,9 @@ import (
 	"fmt"
 
 	"github.com/turtlearmy/online-whiteboard/internal/canvas"
+	"github.com/turtlearmy/online-whiteboard/internal/conn"
+	"github.com/turtlearmy/online-whiteboard/internal/packet"
 )
-
-type Packet interface {
-	// Returns whether or not the packet should be broadcast to other connections
-	Apply(currentCanvas *canvas.Canvas, users *UserManager, sender ConnId) (bool, error)
-	encoded() ([]byte, error)
-}
 
 const (
 	TYPE_PAINT_LAYER_SET  = "paint_layer_set"
@@ -23,7 +19,7 @@ type rawMessage struct {
 	Data json.RawMessage `json:"data"`
 }
 
-func decode(rawData []byte) (Packet, error) {
+func decode(rawData []byte) (packet.Packet, error) {
 	var msg rawMessage
 	if err := json.Unmarshal(rawData, &msg); err != nil {
 		return nil, err
@@ -39,22 +35,22 @@ func decode(rawData []byte) (Packet, error) {
 	return packet, nil
 }
 
-var packetTypes = map[string]func() Packet{
-	TYPE_PAINT_LAYER_SET: func() Packet {
+var packetTypes = map[string]func() packet.Packet{
+	TYPE_PAINT_LAYER_SET: func() packet.Packet {
 		return &paintLayerSetPacket{}
 	},
 
-	TYPE_PAINT_LAYER_DRAW: func() Packet {
+	TYPE_PAINT_LAYER_DRAW: func() packet.Packet {
 		return &paintLayerDrawPacket{}
 	},
 }
 
 type paintLayerSetPacket struct {
-	Image encodedCanvas `json:"image"`
+	Image canvas.Encoded `json:"image"`
 }
 
-func (packet *paintLayerSetPacket) Apply(currentCanvas *canvas.Canvas, users *UserManager, sender ConnId) (bool, error) {
-	image, err := packet.Image.decode()
+func (packet *paintLayerSetPacket) Apply(currentCanvas canvas.Canvas, sender conn.Id) (bool, error) {
+	image, err := packet.Image.Decode()
 	if err != nil {
 		return false, err
 	}
@@ -64,21 +60,21 @@ func (packet *paintLayerSetPacket) Apply(currentCanvas *canvas.Canvas, users *Us
 	return true, nil
 }
 
-func (packet *paintLayerSetPacket) encoded() ([]byte, error) {
+func (packet *paintLayerSetPacket) Encoded() ([]byte, error) {
 	return json.Marshal(map[string]interface{}{"type": TYPE_PAINT_LAYER_SET, "data": packet})
 }
 
-func NewPaintLayerSetPacket(currentCanvas *canvas.Canvas) (Packet, error) {
-	return &paintLayerSetPacket{*encodeCanvas(currentCanvas)}, nil
+func NewPaintLayerSetPacket(currentCanvas canvas.Canvas) (packet.Packet, error) {
+	return &paintLayerSetPacket{currentCanvas.Encode()}, nil
 }
 
 type paintLayerDrawPacket struct {
-	Pos   canvas.Pos    `json:"pos"`
-	Image encodedCanvas `json:"image"`
+	Pos   canvas.Pos     `json:"pos"`
+	Image canvas.Encoded `json:"image"`
 }
 
-func (packet *paintLayerDrawPacket) Apply(currentCanvas *canvas.Canvas, users *UserManager, sender ConnId) (bool, error) {
-	image, err := packet.Image.decode()
+func (packet *paintLayerDrawPacket) Apply(currentCanvas canvas.Canvas, sender conn.Id) (bool, error) {
+	image, err := packet.Image.Decode()
 	if err != nil {
 		return false, err
 	}
@@ -88,6 +84,6 @@ func (packet *paintLayerDrawPacket) Apply(currentCanvas *canvas.Canvas, users *U
 	return true, nil
 }
 
-func (packet *paintLayerDrawPacket) encoded() ([]byte, error) {
+func (packet *paintLayerDrawPacket) Encoded() ([]byte, error) {
 	return json.Marshal(map[string]interface{}{"type": TYPE_PAINT_LAYER_DRAW, "data": packet})
 }

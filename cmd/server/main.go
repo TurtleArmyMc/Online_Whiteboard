@@ -2,8 +2,8 @@ package main
 
 import (
 	"github.com/gin-gonic/gin"
-	"github.com/turtlearmy/online-whiteboard/internal/comm"
 	"github.com/turtlearmy/online-whiteboard/internal/room"
+	"github.com/turtlearmy/online-whiteboard/internal/user"
 )
 
 func main() {
@@ -15,7 +15,12 @@ func main() {
 	r.StaticFile("/workspace.js", "web/static/workspace.js")
 
 	r.GET("/ws", func(c *gin.Context) {
-		room.WsHandler(c.Writer, c.Request, comm.NewSession())
+		session, err := c.Cookie("session")
+		if err != nil {
+			session = string(user.NewSession())
+			c.SetCookie("session", session, 24*24*60, "/", "localhost", false, true)
+		}
+		room.WsHandler(c.Writer, c.Request, user.Session(session))
 	})
 
 	r.Run("0.0.0.0:8080")
