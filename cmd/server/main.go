@@ -18,7 +18,7 @@ func main() {
 		session, err := c.Cookie("session")
 		if err != nil {
 			session = string(user.NewSession())
-			c.SetCookie("session", session, 24*24*60, "/", "localhost", false, true)
+			c.SetCookie("session", session, 24*24*60, "", "", false, false)
 		}
 		room.WsHandler(c.Writer, c.Request, user.Session(session))
 	})

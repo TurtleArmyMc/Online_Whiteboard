@@ -1,17 +1,17 @@
 package layer
 
-import (
-	"github.com/turtlearmy/online-whiteboard/internal/canvas"
-)
+import "github.com/turtlearmy/online-whiteboard/internal/user"
 
-type Layer struct {
-	Canvas  canvas.Canvas
-	OwnerId uint
+type Id uint
+type Type string
+
+type Layer interface {
+	LayerType() Type
+	InitPacket() user.OutgoingPacket
+	Id() Id
+	Owner() user.Id
 }
 
-func (layer *Layer) Draw(pos canvas.Pos, src canvas.Canvas) error {
-	if err := layer.Canvas.Draw(pos, src); err != nil {
-		return err
-	}
-	return nil
+type Handler interface {
+	Handle(*Manager, *user.Manager, user.Id) (broadcast bool, err error)
 }

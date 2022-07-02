@@ -4,32 +4,129 @@ import (
 	"log"
 	"net/http"
 
-	"github.com/turtlearmy/online-whiteboard/internal/canvas"
-	"github.com/turtlearmy/online-whiteboard/internal/comm"
-	"github.com/turtlearmy/online-whiteboard/internal/conn"
+	"github.com/gorilla/websocket"
+	"github.com/turtlearmy/online-whiteboard/internal/layer"
+	"github.com/turtlearmy/online-whiteboard/internal/layer/paintlayer"
+	"github.com/turtlearmy/online-whiteboard/internal/layer/paintlayer/canvas"
+	"github.com/turtlearmy/online-whiteboard/internal/packets"
 	"github.com/turtlearmy/online-whiteboard/internal/user"
 )
 
 type Room struct {
 	currentCanvas    canvas.Canvas
-	newConnections   chan *conn.Connection
-	incomingMessages chan *comm.Message
-	users            *comm.UserManager
-	open             bool
+	newConnections   chan user.Connection
+	incomingMessages chan *message
+
+	layers *layer.Manager
+	users  *user.Manager
+
+	open bool
 }
 
 func New() *Room {
 	room := &Room{
 		canvas.NewWhite(canvas.Height, canvas.Width),
-		make(chan *conn.Connection, 3),
-		make(chan *comm.Message, 20),
-		comm.NewUserManager(),
+		make(chan user.Connection, 3),
+		make(chan *message, 20),
+
+		// comm.NewUserManager(),
+
+		&layer.Manager{},
+		user.NewManager(),
+		// conn.NewManager(),
+
 		true,
 	}
 
 	go room.handleEvents()
 
 	return room
+}
+
+func (room *Room) WsHandler(writer http.ResponseWriter, req *http.Request, session user.Session) {
+	conn, err := room.addConnection(writer, req, session)
+	if err != nil {
+		log.Printf("error adding websocket connection: %v\n", err)
+		return
+	}
+	room.newConnections <- *conn
+}
+
+func (room *Room) addConnection(writer http.ResponseWriter, req *http.Request, session user.Session) (*user.Connection, error) {
+	ws, err := wsupgrader.Upgrade(writer, req, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	u := room.users.ForSession(session)
+	// c := room.c.Add(ws, u.Id)
+	c := room.users.AddConnection(ws, u)
+
+	// Read incoming messages
+	go func() {
+		for {
+			t, msgData, err := ws.ReadMessage()
+			if err != nil {
+				break
+			}
+			if t == websocket.BinaryMessage {
+				log.Printf("warning: received binary message `%s`", msgData)
+			}
+			if t == websocket.TextMessage {
+				if packet, err := packets.Deserialize(msgData); err != nil {
+					log.Printf("error decoding incoming packet: %v\n", err)
+				} else {
+					room.incomingMessages <- &message{packet, c}
+				}
+			}
+		}
+
+		room.removeConnection(c)
+	}()
+
+	return &c, nil
+}
+
+func (room *Room) setupNewConnection(c user.Connection) error {
+	// Send user id to client
+	if err := c.Send(user.SetUserIdPacket(c.User)); err != nil {
+		return err
+	}
+
+	// Create new layer for user if none are owned
+	if len(room.layers.OwnedLayers(c.User)) == 0 {
+		l, err := room.layers.CreateLayer(paintlayer.LAYER_TYPE, c.User)
+		if err != nil {
+			return err
+		}
+		// Inform other connections of new layer
+		if err := room.users.SendFrom(layer.NewCreatePacket(l, 0), c); err != nil {
+			return err
+		}
+		if err := room.users.SendFrom(l.InitPacket(), c); err != nil {
+			return err
+		}
+
+		room.layers.Add(l)
+	}
+
+	// Inform connection of all existing layers
+	for layerHeight, l := range room.layers.Layers {
+		if err := c.Send(layer.NewCreatePacket(l, layerHeight)); err != nil {
+			return err
+		}
+		if err := c.Send(l.InitPacket()); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (room *Room) removeConnection(c user.Connection) {
+	room.users.RemoveConnection(c)
+	if room.users.ConnectionCount() == 0 {
+		// TODO: Remove room
+	}
 }
 
 func (room *Room) handleEvents() {
@@ -42,33 +139,20 @@ func (room *Room) handleEvents() {
 				}
 			}
 		case msg := <-room.incomingMessages:
-			broadcast, err := msg.Packet.Apply(room.currentCanvas, msg.Sender)
+			broadcast, err := msg.Packet.Handle(room.layers, room.users, msg.Sender.User)
 			if err != nil {
 				log.Printf("error applying packet: %v\n", err)
 			}
 			if broadcast {
-				room.users.BroadcastFrom(msg.Packet, msg.Sender)
+				if err := room.users.SendFrom(msg.Packet, msg.Sender); err != nil {
+					log.Printf("error broadcasting packet: %v\n", err)
+				}
 			}
 		}
 	}
 }
 
-func (room *Room) setupNewConnection(c *conn.Connection) error {
-	packet, err := comm.NewPaintLayerSetPacket(room.currentCanvas)
-	if err != nil {
-		return err
-	}
-	if err := room.users.BroadcastTo(packet, c); err != nil {
-		return err
-	}
-	return nil
-}
-
-func (room *Room) WsHandler(writer http.ResponseWriter, req *http.Request, session user.Session) {
-	conn, err := room.users.AddConnection(writer, req, session, room.incomingMessages)
-	if err != nil {
-		log.Printf("error adding websocket connection: %v\n", err)
-		return
-	}
-	room.newConnections <- conn
+var wsupgrader = websocket.Upgrader{
+	ReadBufferSize:  canvas.Height * canvas.Width * 10, // 1024,
+	WriteBufferSize: canvas.Height * canvas.Width * 10, // 1024,
 }

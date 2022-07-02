@@ -7,8 +7,36 @@
     <meta name='viewport' content='width=device-width, initial-scale=1'>
     <link rel='stylesheet' type='text/css' media='screen' href='main.css'>
     <script defer src='workspace.js'></script>
+    <style>
+        #main_display {
+            display: inline-block;
+            border: 1px;
+            border-color: red;
+            border-style: solid;
+            width: 1920px;
+            height: 1080px;
+            max-width: 50vw;
+            max-height: 50vh;
+            resize: both;
+        }
+
+        #main_display canvas {
+            position: fixed;
+            max-width: 50vw;
+            max-height: 50vh;
+        }
+    </style>
 </head>
 <body>
-    <canvas id="main_display" style="border: 1px; border-color: red; border-style: solid;", width="1920", height="1080"></canvas>
+    <div id="main_display"></div>
+    <br>
+    <div>Red</div>
+    <input type="range" min="0" max="255" value="0" id="red">
+    <br>
+    <div>Green</div>
+    <input type="range" min="0" max="255" value="0" id="green">
+    <br>
+    <div>Blue</div>
+    <input type="range" min="0" max="255" value="0" id="blue">
 </body>
 </html>

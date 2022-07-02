@@ -9,8 +9,8 @@ type Canvas struct {
 }
 
 const (
-	Height = 1920
-	Width  = 1080
+	Width  = 1920
+	Height = 1080
 )
 
 func New(data []byte, width, height int) (Canvas, error) {
