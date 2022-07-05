@@ -6,6 +6,15 @@ import (
 	"github.com/turtlearmy/online-whiteboard/internal/user"
 )
 
+func getSession(c *gin.Context) user.Session {
+	session, err := c.Cookie("session")
+	if err != nil {
+		session = string(user.NewSession())
+		c.SetCookie("session", session, 24*24*60, "", "", false, false)
+	}
+	return user.Session(session)
+}
+
 func main() {
 	room := room.New()
 
@@ -14,13 +23,13 @@ func main() {
 	r.StaticFile("/workspace.html", "web/static/workspace.html")
 	r.StaticFile("/workspace.js", "web/static/workspace.js")
 
+	// Set session cookie for all connections
+	r.Use(func(c *gin.Context) {
+		getSession(c)
+	})
+
 	r.GET("/ws", func(c *gin.Context) {
-		session, err := c.Cookie("session")
-		if err != nil {
-			session = string(user.NewSession())
-			c.SetCookie("session", session, 24*24*60, "", "", false, false)
-		}
-		room.WsHandler(c.Writer, c.Request, user.Session(session))
+		room.WsHandler(c.Writer, c.Request, getSession(c))
 	})
 
 	r.Run("0.0.0.0:8080")

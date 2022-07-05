@@ -59,7 +59,6 @@ func (room *Room) addConnection(writer http.ResponseWriter, req *http.Request, s
 	}
 
 	u := room.users.ForSession(session)
-	// c := room.c.Add(ws, u.Id)
 	c := room.users.AddConnection(ws, u)
 
 	// Read incoming messages
@@ -90,6 +89,11 @@ func (room *Room) addConnection(writer http.ResponseWriter, req *http.Request, s
 func (room *Room) setupNewConnection(c user.Connection) error {
 	// Send user id to client
 	if err := c.Send(user.SetUserIdPacket(c.User)); err != nil {
+		return err
+	}
+
+	// Send usernames to client
+	if err := c.Send(room.users.NewMapNamesPacket()); err != nil {
 		return err
 	}
 

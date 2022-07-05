@@ -1,5 +1,62 @@
 var LocalUserId = 0;
 
+class EventListener {
+    constructor(callbacks) {
+        this._callbacks = new Set(callbacks);
+    }
+
+    register(callback) {
+        this._callbacks.add(callback);
+    }
+
+    call(val) {
+        this._callbacks.forEach(callback => callback(val));
+    }
+}
+
+const Usernames = {
+    names: {},
+    _nameChangeEvent: new EventListener(),
+
+    setLocalName: function (name) {
+        this.setName(LocalUserId, name);
+        let packet = {
+            'type': PACKET_SET_NAME,
+            'data': {
+                'id': LocalUserId,
+                'name': name,
+            },
+        };
+        socket.send(JSON.stringify(packet));
+    },
+
+    getName: function (user) {
+        let name = this.names[user];
+        return name === undefined ? "Anonymous " + user : name;
+    },
+
+    setNames: function (names) {
+        this.names = names;
+        this.updateNameDisplay(null, null);
+        this._nameChangeEvent.call(null, null);
+    },
+
+    setName: function (user, name) {
+        this.names[user] = name;
+        this.updateNameDisplay(user, name);
+        this._nameChangeEvent.call(user, name);
+    },
+
+    updateNameDisplay: function (..._) {
+        document.getElementById("name_display").value = this.getName(LocalUserId);
+    },
+
+    /** @param {function(?number,?string):void} callback */
+    addNameChangeCallback: function (callback) {
+        this._nameChangeEvent.register(callback);
+    },
+};
+
 const CANVAS_WIDTH = 1920;
 const CANVAS_HEIGHT = 1080;
 
@@ -13,7 +70,7 @@ class PaintLayer {
         this.canvas.height = CANVAS_HEIGHT;
     }
 
-    sendEditPacket(minX, minY, maxX, maxY) {
+    sendDrawPacket(minX, minY, maxX, maxY) {
         // Make sure coords are within bounds
         minX = Math.max(Math.floor(minX), 0);
         minY = Math.max(Math.floor(minY), 0);
@@ -28,7 +85,7 @@ class PaintLayer {
             "type": PACKET_PAINT_LAYER_DRAW,
             "data": {
                 "pos": { "x": minX, "y": minY },
-                "image": imageDataToB64(imgData),
+                "image": encodeImageData(imgData),
                 "layer": this.id,
             },
         };
@@ -38,15 +95,25 @@ class PaintLayer {
     static type = "paint_layer";
 };
 
-const LayerManager = {
+const Layers = {
     activeLayer: undefined,
     layers: [],
     idToLayer: {},
 
+    _layerAddEvent: new EventListener(),
+
+    getChecked: function (id, type) {
+        let layer = this.idToLayer[id];
+        if (layer === undefined) throw `no layer with id ${id}`;
+        if (!(type === undefined) && !(layer instanceof type)) throw `layer ${id} is not a ${type.name}`;
+        return layer;
+    },
+
     insertLayer: function (height, layer) {
         this.layers.splice(height, 0, layer);
         this.idToLayer[layer.id] = layer;
-        this.displayLayers();
+        this.displayLayers(layer, height);
+        this._layerAddEvent.call(layer, height);
     },
 
     activeLayerHeight: function () {
@@ -56,12 +123,24 @@ const LayerManager = {
         return -1;
     },
 
-    displayLayers: function () {
+    displayLayers: function (changedLayer, changeHeight) {
         let mainDisplay = document.getElementById("main_display");
-        [...mainDisplay.children].forEach(child => child.remove());
-        this.layers.forEach(layer => mainDisplay.insertBefore(layer.canvas, mainDisplay.firstElementChild));
+        mainDisplay.replaceChildren(...this.layers.map(layer => layer.canvas));
+
+        let layerSelector = document.getElementById("layer_selector");
+        layerSelector.replaceChildren(...this.layers.map(layer => {
+            let p = document.createElement("p");
+            p.innerText = "ID: " + layer.id + " OWNER: " + Usernames.getName(layer.owner);
+            return p;
+        }));
+    },
+
+    /** @param {function(?Layer, ?height):void} callback */
+    addLayerAddCallback(callback) {
+        this._layerAddEvent.register(callback);
     },
 };
+Usernames.addNameChangeCallback((user, name) => Layers.displayLayers(null, null));
 
 const LayerTypes = {
     [PaintLayer.type]: PaintLayer
@@ -76,16 +155,18 @@ var socket;
 }
 window.onclose = (_) => socket.close();
 
-/**
- * @param {ImageData} image
- * @returns {Object}
- */
-var imageDataToB64 = function (image) {
-    let imageData = btoa(String.fromCharCode.apply(null, image.data));;
+/** @param {Uint8ClampedArray} array */
+const uint8ToB64 = array => btoa(String.fromCharCode.apply(null, array));
+
+/** @param {string} s */
+const b64ToUint8 = s => new Uint8ClampedArray(atob(s).split("").map((c) => c.charCodeAt(0)));
+
+/** @param {ImageData} image */
+const encodeImageData = function (image) {
     return {
         width: image.width,
         height: image.height,
-        data: imageData
+        data: uint8ToB64(image.data)
     };
 }
 
@@ -94,12 +175,10 @@ var imageDataToB64 = function (image) {
  * @param {string} img.data
  * @param {number} img.width
  * @param {number} img.height
- * @returns {ImageData}
  */
-var b64ToImageData = function (img) {
-    let data = new Uint8ClampedArray(atob(img.data).split("").map((c) => c.charCodeAt(0)));
+const decodeImageData = function (img) {
     return new ImageData(
-        data,
+        b64ToUint8(img.data),
         img.width,
         img.height
     );
@@ -107,46 +186,42 @@ var b64ToImageData = function (img) {
 
 // Packet types
 const PACKET_SET_USER_ID = "set_uid";
+const PACKET_MAP_NAMES = "map_names";
+const PACKET_SET_NAME = "set_name";
 const PACKET_CREATE_LAYER = "create_layer";
 const PACKET_PAINT_LAYER_SET = "paint_layer_set";
 const PACKET_PAINT_LAYER_DRAW = "paint_layer_draw";
 
 // Handle received packets
 const PacketHandlers = {
-    [PACKET_SET_USER_ID]: (data) => {
-        LocalUserId = data;
-    },
+    [PACKET_SET_USER_ID]: data => LocalUserId = data,
 
-    [PACKET_CREATE_LAYER]: (data) => {
+    [PACKET_MAP_NAMES]: data => Usernames.setNames(data),
+
+    [PACKET_SET_NAME]: data => Usernames.setName(data.id, data.name),
+
+    [PACKET_CREATE_LAYER]: data => {
         let constructor = LayerTypes[data.layer_type];
         if (constructor === undefined) {
             console.log("error: unknown layer type `" + data.layer_type + "`");
             return
         }
         let layer = new constructor(data.id, data.owner);
-        LayerManager.insertLayer(data.height, layer);
+        Layers.insertLayer(data.height, layer);
 
-        if (layer.owner == LocalUserId) LayerManager.activeLayer = layer;
+        if (layer.owner == LocalUserId) Layers.activeLayer = layer;
     },
 
-    [PACKET_PAINT_LAYER_SET]: (data) => {
-        let layer = LayerManager.idToLayer[data.layer];
-        if (layer === undefined) {
-            console.log("no layer with id " + data.layer);
-            return;
-        }
-        let imageData = b64ToImageData(data.image);
+    [PACKET_PAINT_LAYER_SET]: data => {
+        let layer = Layers.getChecked(data.layer, PaintLayer);
+        let imageData = decodeImageData(data.image);
         let ctx = layer.canvas.getContext("2d");
         ctx.putImageData(imageData, 0, 0);
     },
 
-    [PACKET_PAINT_LAYER_DRAW]: (data) => {
-        let layer = LayerManager.idToLayer[data.layer];
-        if (layer === undefined) {
-            console.log("no layer with id " + data.layer);
-            return;
-        }
-        let imageData = b64ToImageData(data.image);
+    [PACKET_PAINT_LAYER_DRAW]: data => {
+        let layer = Layers.getChecked(data.layer, PaintLayer);
+        let imageData = decodeImageData(data.image);
         let ctx = layer.canvas.getContext("2d");
         ctx.putImageData(imageData, data.pos.x, data.pos.y);
     },
@@ -234,6 +309,20 @@ const getCanvasPos = function (e, canvas) {
 
 // Tools are used to handle how mouse events should affect the canvas
 const Tools = {
+    COLOR: "#000000", // Global color for all tools
+    BRUSH_SIZE: 15, // Global brush size for all tools
+
+    updateColor: function () {
+        console.log(this.COLOR);
+        this.COLOR = `rgb(
+            ${Math.floor(document.getElementById("red").value)},
+            ${Math.floor(document.getElementById("green").value)},
+            ${Math.floor(document.getElementById("blue").value)}
+        )`;
+        this.BRUSH_SIZE = document.getElementById("brush_size").value;
+        document.getElementById("color_preview").style.backgroundColor = this.COLOR;
+    },
+
     Pen: {
         drawDot: function (x, y) {
             this.drawLine(x, y, x, y);
@@ -241,37 +330,20 @@ const Tools = {
 
         // TODO: Fix short lines appearing jagged
         drawLine: function (x1, y1, x2, y2) {
-            if (LayerManager.activeLayer === undefined) return;
-            let ctx = LayerManager.activeLayer.canvas.getContext("2d");
+            if (!Layers.activeLayer instanceof PaintLayer) return;
+            /** @type {CanvasRenderingContext2D} */
+            let ctx = Layers.activeLayer.canvas.getContext("2d");
 
-            console.log(document.getElementById("red").value);
-            console.log(document.getElementById("green").value);
-            console.log(document.getElementById("blue").value);
-
-            ctx.strokeStyle = `rgb(
-                ${Math.floor(document.getElementById("red").value)},
-                ${Math.floor(document.getElementById("green").value)},
-                ${Math.floor(document.getElementById("blue").value)}
-            )`;
+            ctx.strokeStyle = Tools.COLOR;
 
             // TODO: Allow user to adjust width
-            ctx.lineWidth = 15;
+            ctx.lineWidth = Tools.BRUSH_SIZE;
             ctx.lineCap = "round";
 
-            // Center line on cursor
-            // FIXME: Does not work well, especially for different line widths
-            x1 -= Math.ceil(ctx.lineWidth * 0.5);
-            x2 -= Math.ceil(ctx.lineWidth * 0.5);
-            y1 -= Math.ceil(ctx.lineWidth * 0.5);
-            y2 -= Math.ceil(ctx.lineWidth * 0.5);
-
             ctx.beginPath();
-
             ctx.moveTo(x1, y1);
             ctx.lineTo(x2, y2);
-
             ctx.closePath();
-
             ctx.stroke();
 
             let minX = Math.min(x1, x2);
@@ -279,7 +351,7 @@ const Tools = {
             let maxX = Math.max(x1, x2);
             let maxY = Math.max(y1, y2);
 
-            LayerManager.activeLayer.sendEditPacket(
+            Layers.activeLayer.sendDrawPacket(
                 minX - ctx.lineWidth - 2,
                 minY - ctx.lineWidth - 2,
                 maxX + ctx.lineWidth + 2,
@@ -288,12 +360,12 @@ const Tools = {
         },
 
         onmousedown: function (e) {
-            let pos = getCanvasPos(e, LayerManager.activeLayer.canvas);
+            let pos = getCanvasPos(e, Layers.activeLayer.canvas);
             if (pos != undefined) this.drawDot(pos.x, pos.y);
         },
 
         onmouseup: function (e) {
-            let pos = getCanvasPos(e, LayerManager.activeLayer.canvas);
+            let pos = getCanvasPos(e, Layers.activeLayer.canvas);
             if (pos != undefined) this.drawDot(pos.x, pos.y);
         },
 
@@ -301,7 +373,7 @@ const Tools = {
         onmousemove: function (e) {
             let mouseDown = !!(e.buttons & 1);
             if (mouseDown) {
-                let pos = getCanvasPos(e, LayerManager.activeLayer.canvas);
+                let pos = getCanvasPos(e, Layers.activeLayer.canvas);
                 if (pos != undefined) {
                     this.drawLine(
                         pos.x - pos.movementX,
@@ -313,7 +385,8 @@ const Tools = {
             }
         }
     }
-}
+};
+Tools.updateColor(); // Sets preview color window
 
 // The global current tool
 var CurrentTool = Tools.Pen;

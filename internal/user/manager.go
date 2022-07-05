@@ -1,6 +1,7 @@
 package user
 
 import (
+	"fmt"
 	"sync"
 
 	"github.com/gorilla/websocket"
@@ -13,11 +14,13 @@ type Manager struct {
 	connections map[connectionId]Connection
 	nextConnId  connectionId
 
+	names map[Id]string
+
 	mu sync.RWMutex
 }
 
 func NewManager() *Manager {
-	return &Manager{sessions: map[Session]Id{}, connections: map[connectionId]Connection{}}
+	return &Manager{sessions: map[Session]Id{}, connections: map[connectionId]Connection{}, names: map[Id]string{}}
 }
 
 func (users *Manager) ForSession(session Session) Id {
@@ -80,8 +83,24 @@ func (users *Manager) Online(u Id) bool {
 	return false
 }
 
+func (users *Manager) Name(user Id) string {
+	users.mu.RLock()
+	defer users.mu.RUnlock()
+
+	if name, ok := users.names[user]; ok {
+		return name
+	}
+	return fmt.Sprintf("Anonymous %d", user)
+}
+
+func (users *Manager) SetName(user Id, name string) {
+	users.mu.Lock()
+	users.names[user] = name
+	users.mu.Unlock()
+}
+
 func (users *Manager) SendFrom(packet OutgoingPacket, sender Connection) error {
-	data, err := SerializePacket(packet)
+	data, err := serializePacket(packet)
 	if err != nil {
 		return err
 	}

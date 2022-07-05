@@ -3,7 +3,7 @@ package layer
 import "github.com/turtlearmy/online-whiteboard/internal/user"
 
 type Manager struct {
-	// Stored in order of top to bottom
+	// Stored in order of bottom to top
 	Layers []Layer
 
 	nextId Id
@@ -39,7 +39,7 @@ func (layers *Manager) GetAtHeight(i int) Layer {
 }
 
 func (layers *Manager) Add(layer Layer) {
-	layers.Layers = append(layers.Layers, layer)
+	layers.Insert(layer, 0)
 }
 
 // returns if insert was within bounds

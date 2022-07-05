@@ -9,7 +9,7 @@ type Connection struct {
 }
 
 func (c *Connection) Send(packet OutgoingPacket) error {
-	data, err := SerializePacket(packet)
+	data, err := serializePacket(packet)
 	if err != nil {
 		return err
 	}
