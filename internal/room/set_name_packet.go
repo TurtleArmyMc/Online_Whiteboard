@@ -3,8 +3,8 @@ package room
 import (
 	"fmt"
 
+	"github.com/turtlearmy/online-whiteboard/internal/c2s"
 	"github.com/turtlearmy/online-whiteboard/internal/layer"
-	"github.com/turtlearmy/online-whiteboard/internal/packets"
 	"github.com/turtlearmy/online-whiteboard/internal/user"
 )
 
@@ -15,17 +15,17 @@ type SetNamePacket struct {
 	Name string  `json:"name"`
 }
 
-var _ = packets.Register(packet_type_set_name, func() packets.Packet { return &SetNamePacket{} })
+var _ = c2s.Register(packet_type_set_name, func() layer.Handler { return &SetNamePacket{} })
 
 func (packet *SetNamePacket) PacketType() string {
 	return packet_type_set_name
 }
 
-func (packet *SetNamePacket) Handle(layers *layer.Manager, users *user.Manager, sender user.Id) (broadcast bool, err error) {
+func (packet *SetNamePacket) Handle(layers *layer.Manager, users *user.Manager, sender user.Id) (user.OutgoingPacket, error) {
 	senderName := users.Name(sender)
 	if packet.Id != sender {
 		setName := users.Name(packet.Id)
-		return false, fmt.Errorf(
+		return nil, fmt.Errorf(
 			"user '%s' (id %d) attempted set name of user '%s' (id %d) to '%s'",
 			senderName,
 			sender,
@@ -36,8 +36,8 @@ func (packet *SetNamePacket) Handle(layers *layer.Manager, users *user.Manager, 
 	}
 	if senderName == packet.Name {
 		// Do nothing if name is the same
-		return false, nil
+		return nil, nil
 	}
 	users.SetName(sender, packet.Name)
-	return true, nil
+	return packet, nil
 }

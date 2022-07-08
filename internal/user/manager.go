@@ -43,7 +43,7 @@ func (users *Manager) AddConnection(ws *websocket.Conn, u Id) Connection {
 	users.nextConnId++
 	id := users.nextConnId
 
-	outgoing := make(chan []byte, 10)
+	outgoing := make(chan []byte, 64)
 
 	c := Connection{outgoing, u, id}
 

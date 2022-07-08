@@ -13,5 +13,5 @@ type Layer interface {
 }
 
 type Handler interface {
-	Handle(*Manager, *user.Manager, user.Id) (broadcast bool, err error)
+	Handle(*Manager, *user.Manager, user.Id) (user.OutgoingPacket, error)
 }

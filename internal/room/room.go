@@ -5,10 +5,10 @@ import (
 	"net/http"
 
 	"github.com/gorilla/websocket"
+	"github.com/turtlearmy/online-whiteboard/internal/c2s"
 	"github.com/turtlearmy/online-whiteboard/internal/layer"
 	"github.com/turtlearmy/online-whiteboard/internal/layer/paintlayer"
 	"github.com/turtlearmy/online-whiteboard/internal/layer/paintlayer/canvas"
-	"github.com/turtlearmy/online-whiteboard/internal/packets"
 	"github.com/turtlearmy/online-whiteboard/internal/user"
 )
 
@@ -26,8 +26,8 @@ type Room struct {
 func New() *Room {
 	room := &Room{
 		canvas.NewWhite(canvas.Height, canvas.Width),
-		make(chan user.Connection, 3),
-		make(chan *message, 20),
+		make(chan user.Connection, 8),
+		make(chan *message, 256),
 
 		// comm.NewUserManager(),
 
@@ -72,7 +72,7 @@ func (room *Room) addConnection(writer http.ResponseWriter, req *http.Request, s
 				log.Printf("warning: received binary message `%s`", msgData)
 			}
 			if t == websocket.TextMessage {
-				if packet, err := packets.Deserialize(msgData); err != nil {
+				if packet, err := c2s.Deserialize(msgData); err != nil {
 					log.Printf("error decoding incoming packet: %v\n", err)
 				} else {
 					room.incomingMessages <- &message{packet, c}
@@ -147,8 +147,8 @@ func (room *Room) handleEvents() {
 			if err != nil {
 				log.Printf("error applying packet: %v\n", err)
 			}
-			if broadcast {
-				if err := room.users.SendFrom(msg.Packet, msg.Sender); err != nil {
+			if broadcast != nil {
+				if err := room.users.SendFrom(broadcast, msg.Sender); err != nil {
 					log.Printf("error broadcasting packet: %v\n", err)
 				}
 			}
@@ -157,6 +157,6 @@ func (room *Room) handleEvents() {
 }
 
 var wsupgrader = websocket.Upgrader{
-	ReadBufferSize:  canvas.Height * canvas.Width * 10, // 1024,
-	WriteBufferSize: canvas.Height * canvas.Width * 10, // 1024,
+	ReadBufferSize:  canvas.Height * canvas.Width * 4 * 10, // 1024,
+	WriteBufferSize: canvas.Height * canvas.Width * 4 * 10, // 1024,
 }
