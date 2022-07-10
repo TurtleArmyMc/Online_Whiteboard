@@ -8,17 +8,17 @@ import (
 	"github.com/turtlearmy/online-whiteboard/internal/user"
 )
 
-const packet_type_set_name = "set_name"
+const packet_type_set_username = "set_username"
 
 type SetNamePacket struct {
 	Id   user.Id `json:"id"`
 	Name string  `json:"name"`
 }
 
-var _ = c2s.Register(packet_type_set_name, func() layer.Handler { return &SetNamePacket{} })
+var _ = c2s.Register(packet_type_set_username, func() layer.Handler { return &SetNamePacket{} })
 
 func (packet *SetNamePacket) PacketType() string {
-	return packet_type_set_name
+	return packet_type_set_username
 }
 
 func (packet *SetNamePacket) Handle(layers *layer.Manager, users *user.Manager, sender user.Id) (user.OutgoingPacket, error) {

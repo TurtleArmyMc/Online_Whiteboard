@@ -21,7 +21,7 @@ const Usernames = {
     setLocalName: function (name) {
         this.setName(LocalUserId, name);
         let packet = {
-            'type': PACKET_SET_NAME,
+            'type': PACKET_SET_USERNAME,
             'data': {
                 'id': LocalUserId,
                 'name': name,
@@ -93,18 +93,50 @@ class PaintLayer {
     }
 
     static type = "paint_layer";
-};
+}
+
+class LayerSelector {
+    constructor(layer) {
+        this.layer = layer;
+        this.owner = layer.owner;
+
+        this.htmlElement = document.createElement("div");
+
+        let checkboxId = `layer_selector_${layer.id}`;
+
+        this.checkbox = document.createElement("input");
+        this.checkbox.type = "checkbox";
+        this.checkbox.id = checkboxId;
+        let enabled = LocalUserId === layer.owner;
+        this.checkbox.disabled = !enabled;
+        if (enabled) {
+            this.checkbox.checked = layer == Layers.activeLayer;
+            this.checkbox.onchange = function (e) {
+                let checked = this.checked;
+                document.getElementById("layer_list").childNodes.forEach(c => c.firstChild.checked = false);
+                this.checked = checked;
+                Layers.activeLayer = checked ? layer : null;
+            }
+        }
+        this.htmlElement.appendChild(this.checkbox);
+
+        this.label = document.createElement("label");
+        this.label.setAttribute("for", checkboxId);
+        this.label.innerText = `OWNER: ${Usernames.getName(layer.owner)}`;
+        this.htmlElement.appendChild(this.label);
+    }
+}
 
 const Layers = {
-    activeLayer: undefined,
+    activeLayer: null,
     layers: [],
     idToLayer: {},
 
-    _layerAddEvent: new EventListener(),
+    _layersChangeEvent: new EventListener(),
 
     getChecked: function (id, type) {
         let layer = this.idToLayer[id];
-        if (layer === undefined) throw `no layer with id ${id}`;
+        if (layer === null) throw `no layer with id ${id}`;
         if (!(type === undefined) && !(layer instanceof type)) throw `layer ${id} is not a ${type.name}`;
         return layer;
     },
@@ -112,8 +144,8 @@ const Layers = {
     insertLayer: function (height, layer) {
         this.layers.splice(height, 0, layer);
         this.idToLayer[layer.id] = layer;
-        this.displayLayers(layer, height);
-        this._layerAddEvent.call(layer, height);
+
+        this._layersChangeEvent.call();
     },
 
     activeLayerHeight: function () {
@@ -123,23 +155,50 @@ const Layers = {
         return -1;
     },
 
-    displayLayers: function (changedLayer, changeHeight) {
+    displayLayers: function () {
         let mainDisplay = document.getElementById("main_display");
         mainDisplay.replaceChildren(...this.layers.map(layer => layer.canvas));
 
-        let layerSelector = document.getElementById("layer_selector");
-        layerSelector.replaceChildren(...this.layers.map(layer => {
-            let p = document.createElement("p");
-            p.innerText = "ID: " + layer.id + " OWNER: " + Usernames.getName(layer.owner);
-            return p;
-        }));
+        let layerSelector = document.getElementById("layer_list");
+        layerSelector.replaceChildren(...this.layers.map(layer => new LayerSelector(layer).htmlElement).reverse());
     },
 
-    /** @param {function(?Layer, ?height):void} callback */
-    addLayerAddCallback(callback) {
-        this._layerAddEvent.register(callback);
+    deleteLayer: function (id) {
+        let layer = this.idToLayer[id];
+        if (layer != undefined) {
+            delete this.idToLayer[id];
+            this.layers.splice(this.layers.findIndex(l => l.id === id), 1);
+            if (this.activeLayer.id === id) this.activeLayer = null;
+
+            this._layersChangeEvent.call();
+        }
+    },
+
+    deleteActiveLayer: function () {
+        if (this.activeLayer != null) {
+            let packet = {
+                'type': PACKET_DELETE_LAYER,
+                'data': this.activeLayer.id,
+            };
+            this.deleteLayer(this.activeLayer.id);
+            socket.send(JSON.stringify(packet));
+        }
+    },
+
+    sendCreatePacket: function(type) {
+        let packet = {
+            'type': PACKET_C2S_CREATE_LAYER,
+            'data': type,
+        };
+        socket.send(JSON.stringify(packet));
+    },
+
+    /** @param {function():void} callback */
+    addLayerChangeCallback(callback) {
+        this._layersChangeEvent.register(callback);
     },
 };
+Layers.addLayerChangeCallback(Layers.displayLayers.bind(Layers));
 Usernames.addNameChangeCallback((user, name) => Layers.displayLayers(null, null));
 
 const LayerTypes = {
@@ -156,7 +215,19 @@ var socket;
 window.onclose = (_) => socket.close();
 
 /** @param {Uint8ClampedArray} array */
-const uint8ToB64 = array => btoa(String.fromCharCode.apply(null, array));
+const uint8ToB64 = function (array) {
+    // Array is converted to a string because btoa expects one.
+    // Array is converted in several steps to avoid hitting the maximum
+    // argument limit for js functions when calling apply when serializing
+    // larger images.
+    // array.map is too slow to be an alternative here
+    const step = 65536 - 1;
+    let s = [];
+    for (let i = 0; i < array.length; i += step) {
+        s.push(String.fromCharCode.apply(null, array.slice(i, i + step)));
+    }
+    return btoa(s.join(''));
+}
 
 /** @param {string} s */
 const b64ToUint8 = s => new Uint8ClampedArray(atob(s).split("").map((c) => c.charCodeAt(0)));
@@ -186,31 +257,34 @@ const decodeImageData = function (img) {
 
 // Packet types
 const PACKET_SET_USER_ID = "set_uid";
-const PACKET_MAP_NAMES = "map_names";
-const PACKET_SET_NAME = "set_name";
-const PACKET_CREATE_LAYER = "create_layer";
+const PACKET_MAP_USERNAMES = "map_usernames";
+const PACKET_SET_USERNAME = "set_username";
+const PACKET_C2S_CREATE_LAYER = "c2s_create_layer";
+const PACKET_S2C_CREATE_LAYER = "s2c_create_layer";
+const PACKET_DELETE_LAYER = "delete_layer";
 const PACKET_PAINT_LAYER_SET = "paint_layer_set";
 const PACKET_PAINT_LAYER_DRAW = "paint_layer_draw";
 
 // Handle received packets
-const PacketHandlers = {
+const S2CPacketHandlers = {
     [PACKET_SET_USER_ID]: data => LocalUserId = data,
 
-    [PACKET_MAP_NAMES]: data => Usernames.setNames(data),
+    [PACKET_MAP_USERNAMES]: data => Usernames.setNames(data),
 
-    [PACKET_SET_NAME]: data => Usernames.setName(data.id, data.name),
+    [PACKET_SET_USERNAME]: data => Usernames.setName(data.id, data.name),
 
-    [PACKET_CREATE_LAYER]: data => {
+    [PACKET_S2C_CREATE_LAYER]: data => {
         let constructor = LayerTypes[data.layer_type];
         if (constructor === undefined) {
             console.log("error: unknown layer type `" + data.layer_type + "`");
             return
         }
         let layer = new constructor(data.id, data.owner);
+        if (Layers.activeLayer === null && layer.owner === LocalUserId) Layers.activeLayer = layer;
         Layers.insertLayer(data.height, layer);
-
-        if (layer.owner == LocalUserId) Layers.activeLayer = layer;
     },
+
+    [PACKET_DELETE_LAYER]: Layers.deleteLayer.bind(Layers),
 
     [PACKET_PAINT_LAYER_SET]: data => {
         let layer = Layers.getChecked(data.layer, PaintLayer);
@@ -232,7 +306,7 @@ socket.onmessage = function (e) {
     let msg = JSON.parse(e.data);
     let t = msg.type;
     console.log(t);
-    let h = PacketHandlers[t];
+    let h = S2CPacketHandlers[t];
     if (!!h) {
         h(msg.data);
     } else {
@@ -330,7 +404,7 @@ const Tools = {
 
         // TODO: Fix short lines appearing jagged
         drawLine: function (x1, y1, x2, y2) {
-            if (!Layers.activeLayer instanceof PaintLayer) return;
+            if (!(Layers.activeLayer instanceof PaintLayer)) return;
             /** @type {CanvasRenderingContext2D} */
             let ctx = Layers.activeLayer.canvas.getContext("2d");
 
@@ -351,11 +425,13 @@ const Tools = {
             let maxX = Math.max(x1, x2);
             let maxY = Math.max(y1, y2);
 
+            // Gives the rectangle enough padding to contain the
+            // whole edit, while not being excessively big at the same time
             Layers.activeLayer.sendDrawPacket(
-                minX - ctx.lineWidth - 2,
-                minY - ctx.lineWidth - 2,
-                maxX + ctx.lineWidth + 2,
-                maxY + ctx.lineWidth + 2
+                minX - (ctx.lineWidth / 1.8) - 2,
+                minY - (ctx.lineWidth / 1.8) - 2,
+                maxX + (ctx.lineWidth / 1.8) + 2,
+                maxY + (ctx.lineWidth / 1.8) + 2
             );
         },
 
@@ -393,8 +469,8 @@ var CurrentTool = Tools.Pen;
 
 {
     let mainDisplay = document.getElementById("main_display");
-    mainDisplay.onmousedown = (e) => CurrentTool && CurrentTool.onmousedown && CurrentTool.onmousedown(e);
-    mainDisplay.onmouseup = (e) => CurrentTool && CurrentTool.onmouseup && CurrentTool.onmouseup(e);
-    mainDisplay.onmouseleave = (e) => CurrentTool && CurrentTool.onmouseleave && CurrentTool.onmouseleave(e);
-    mainDisplay.onmousemove = (e) => CurrentTool && CurrentTool.onmousemove && CurrentTool.onmousemove(e);
+    mainDisplay.onmousedown = (e) => Layers.activeLayer && CurrentTool && CurrentTool.onmousedown && CurrentTool.onmousedown(e);
+    mainDisplay.onmouseup = (e) => Layers.activeLayer && CurrentTool && CurrentTool.onmouseup && CurrentTool.onmouseup(e);
+    mainDisplay.onmouseleave = (e) => Layers.activeLayer && CurrentTool && CurrentTool.onmouseleave && CurrentTool.onmouseleave(e);
+    mainDisplay.onmousemove = (e) => Layers.activeLayer && CurrentTool && CurrentTool.onmousemove && CurrentTool.onmousemove(e);
 }

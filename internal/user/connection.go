@@ -1,5 +1,6 @@
 package user
 
+// Used to identify connections. This id is not shared with clients
 type connectionId uint
 
 type Connection struct {
@@ -15,13 +16,4 @@ func (c *Connection) Send(packet OutgoingPacket) error {
 	}
 	c.outgoing <- data
 	return nil
-}
-
-type IdGenerator struct {
-	nextId connectionId
-}
-
-func (gen *IdGenerator) Next() connectionId {
-	gen.nextId++ // Start ids at 1 and not 0
-	return gen.nextId
 }

@@ -7,6 +7,7 @@ import (
 	"github.com/gorilla/websocket"
 	"github.com/turtlearmy/online-whiteboard/internal/c2s"
 	"github.com/turtlearmy/online-whiteboard/internal/layer"
+	layerpackets "github.com/turtlearmy/online-whiteboard/internal/layer/packets"
 	"github.com/turtlearmy/online-whiteboard/internal/layer/paintlayer"
 	"github.com/turtlearmy/online-whiteboard/internal/layer/paintlayer/canvas"
 	"github.com/turtlearmy/online-whiteboard/internal/user"
@@ -104,7 +105,7 @@ func (room *Room) setupNewConnection(c user.Connection) error {
 			return err
 		}
 		// Inform other connections of new layer
-		if err := room.users.SendFrom(layer.NewCreatePacket(l, 0), c); err != nil {
+		if err := room.users.SendFrom(layerpackets.NewS2CCreatePacket(l, 0), c); err != nil {
 			return err
 		}
 		if err := room.users.SendFrom(l.InitPacket(), c); err != nil {
@@ -116,7 +117,7 @@ func (room *Room) setupNewConnection(c user.Connection) error {
 
 	// Inform connection of all existing layers
 	for layerHeight, l := range room.layers.Layers {
-		if err := c.Send(layer.NewCreatePacket(l, layerHeight)); err != nil {
+		if err := c.Send(layerpackets.NewS2CCreatePacket(l, layerHeight)); err != nil {
 			return err
 		}
 		if err := c.Send(l.InitPacket()); err != nil {

@@ -16,6 +16,8 @@ type Manager struct {
 
 	names map[Id]string
 
+	// Sessions, users and connections can be modified at any moment by new
+	// websockets being created, so a mutex is necessary
 	mu sync.RWMutex
 }
 
@@ -31,7 +33,7 @@ func (users *Manager) ForSession(session Session) Id {
 		return u
 	}
 
-	users.nextUserId++
+	users.nextUserId++ // Start ids at 1 and not 0
 	users.sessions[session] = users.nextUserId
 	return users.nextUserId
 }
@@ -40,7 +42,7 @@ func (users *Manager) AddConnection(ws *websocket.Conn, u Id) Connection {
 	users.mu.Lock()
 	defer users.mu.Unlock()
 
-	users.nextConnId++
+	users.nextConnId++ // Start ids at 1 and not 0
 	id := users.nextConnId
 
 	outgoing := make(chan []byte, 64)
@@ -97,6 +99,20 @@ func (users *Manager) SetName(user Id, name string) {
 	users.mu.Lock()
 	users.names[user] = name
 	users.mu.Unlock()
+}
+
+func (users *Manager) SendToAll(packet OutgoingPacket) error {
+	data, err := serializePacket(packet)
+	if err != nil {
+		return err
+	}
+
+	users.mu.RLock()
+	for _, connection := range users.connections {
+		connection.outgoing <- data
+	}
+	users.mu.RUnlock()
+	return nil
 }
 
 func (users *Manager) SendFrom(packet OutgoingPacket, sender Connection) error {

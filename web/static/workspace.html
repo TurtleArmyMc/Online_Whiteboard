@@ -13,15 +13,15 @@
             border: 1px;
             border-color: red;
             border-style: solid;
-            max-width: 80vw;
-            max-height: 95vh;
+            max-width: min(80vw, 1920px);
+            max-height: min(95vh, 1080px);
             aspect-ratio: 16/9;
         }
 
         #main_display canvas {
             position: absolute;
-            max-width: 80vw;
-            max-height: 95vh;
+            max-width: min(80vw, 1920px);
+            max-height: min(95vh, 1080px);
             aspect-ratio: 16/9;
         }
 
@@ -41,6 +41,11 @@
             border-color: #000000;
             background-color: #000000;
         }
+
+        #layer_list > div {
+            display: flex;
+            flex-direction: row;
+        }
     </style>
 </head>
 <body>
@@ -48,7 +53,10 @@
     <br>
     <div id="main_display"></div>
     <div id="sidebar">
-        <div id="layer_selector"></div>
+        <div id="layer_list"></div>
+        <button onclick="if (Layers.activeLayer != null) Layers.deleteActiveLayer()">Delete layer</button>
+        <button onclick="Layers.sendCreatePacket(PaintLayer.type)">Create layer</button>
+        <br>
         <div id="color_preview"></div>
         <div>Red</div>
         <input type="range" min="0" max="255" value="0" id="red" oninput="Tools.updateColor()">
@@ -57,7 +65,7 @@
         <div>Blue</div>
         <input type="range" min="0" max="255" value="0" id="blue" oninput="Tools.updateColor()">
         <div>Brush size</div>
-        <input type="range" min="1" max="50" value="15" id="brush_size" oninput="Tools.updateColor()">
+        <input type="range" min="1" max="200" value="15" id="brush_size" oninput="Tools.updateColor()">
     </div>
     <br>
 </body>
