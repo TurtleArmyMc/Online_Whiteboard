@@ -1,3 +1,4 @@
+// Id of current user. Set by server once connected
 var LocalUserId = 0;
 
 class EventListener {
@@ -60,6 +61,7 @@ const Usernames = {
 const CANVAS_WIDTH = 1920;
 const CANVAS_HEIGHT = 1080;
 
+// A layer that can be drawn on
 class PaintLayer {
     constructor(id, owner) {
         this.id = id;
@@ -70,7 +72,6 @@ class PaintLayer {
         this.canvas.height = CANVAS_HEIGHT;
     }
 
-    // TODO: Fix short lines appearing jagged
     drawLine(x1, y1, x2, y2) {
         /** @type {CanvasRenderingContext2D} */
         let ctx = this.canvas.getContext("2d");
@@ -78,7 +79,6 @@ class PaintLayer {
         ctx.beginPath();
         ctx.moveTo(x1, y1);
         ctx.lineTo(x2, y2);
-        ctx.closePath();
         ctx.stroke();
 
         let minX = Math.min(x1, x2);
@@ -129,14 +129,17 @@ class LayerSelector {
 
         this.htmlElement = document.createElement("div");
 
-        let checkboxId = `layer_selector_${layer.id}`;
+        this.label = document.createElement("label");
+        this.label.innerText = `OWNER: ${Usernames.getName(layer.owner)}`;
 
-        this.checkbox = document.createElement("input");
-        this.checkbox.type = "checkbox";
-        this.checkbox.id = checkboxId;
-        let enabled = LocalUserId === layer.owner;
-        this.checkbox.disabled = !enabled;
-        if (enabled) {
+        // Only add checkbox and event for selecting layers that user owns
+        if (LocalUserId === layer.owner) {
+            let checkboxId = `layer_selector_${layer.id}`;
+            this.label.setAttribute("for", checkboxId);
+
+            this.checkbox = document.createElement("input");
+            this.checkbox.type = "checkbox";
+            this.checkbox.id = checkboxId;
             this.checkbox.checked = layer == Layers.activeLayer;
             this.checkbox.onchange = function (e) {
                 let checked = this.checked;
@@ -144,12 +147,9 @@ class LayerSelector {
                 this.checked = checked;
                 Layers.activeLayer = checked ? layer : null;
             }
+            this.htmlElement.appendChild(this.checkbox);
         }
-        this.htmlElement.appendChild(this.checkbox);
 
-        this.label = document.createElement("label");
-        this.label.setAttribute("for", checkboxId);
-        this.label.innerText = `OWNER: ${Usernames.getName(layer.owner)}`;
         this.htmlElement.appendChild(this.label);
     }
 }
@@ -310,7 +310,7 @@ const S2CPacketHandlers = {
             throw (`error: unknown layer type "${data.layer_type}"`);
         }
         let layer = new constructor(data.id, data.owner);
-        // Automatically select new layers if no layer is currently selected
+        // Automatically select new layer if no layer is currently selected
         if (Layers.activeLayer === null && layer.owner === LocalUserId) Layers.activeLayer = layer;
         Layers.insertLayer(data.height, layer);
     },
@@ -332,7 +332,7 @@ const S2CPacketHandlers = {
     },
 }
 
-// Reads and handles incoming messages
+// Reads and handles incoming messages from the server
 Socket.onmessage = function (e) {
     let msg = JSON.parse(e.data);
     let t = msg.type;
