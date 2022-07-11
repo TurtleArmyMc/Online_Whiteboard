@@ -59,13 +59,18 @@
         <br>
         <div id="color_preview"></div>
         <div>Red</div>
-        <input type="range" min="0" max="255" value="0" id="red" oninput="Tools.updateColor()">
+        <input type="range" min="0" max="255" value="0" id="red" oninput="Brush.updateSettings()">
         <div>Green</div>
-        <input type="range" min="0" max="255" value="0" id="green" oninput="Tools.updateColor()">
+        <input type="range" min="0" max="255" value="0" id="green" oninput="Brush.updateSettings()">
         <div>Blue</div>
-        <input type="range" min="0" max="255" value="0" id="blue" oninput="Tools.updateColor()">
+        <input type="range" min="0" max="255" value="0" id="blue" oninput="Brush.updateSettings()">
         <div>Brush size</div>
-        <input type="range" min="1" max="200" value="15" id="brush_size" oninput="Tools.updateColor()">
+        <input type="range" min="1" max="200" value="15" id="brush_size" oninput="Brush.updateSettings()">
+        <p>Tool:</p>
+        <select id="tool_select" onchange="CurrentTool = Tools[this.value]">
+            <option value="PEN">Pen</option>
+            <option value="ERASER">Eraser</option>
+        </select>
     </div>
     <br>
 </body>
