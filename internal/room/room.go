@@ -130,7 +130,7 @@ func (room *Room) setupNewConnection(c user.Connection) error {
 func (room *Room) removeConnection(c user.Connection) {
 	room.users.RemoveConnection(c)
 	if room.users.ConnectionCount() == 0 {
-		// TODO: Remove room
+		// TODO: Remove room when empty
 	}
 }
 
@@ -158,6 +158,7 @@ func (room *Room) handleEvents() {
 }
 
 var wsupgrader = websocket.Upgrader{
-	ReadBufferSize:  canvas.Height * canvas.Width * 4 * 10, // 1024,
-	WriteBufferSize: canvas.Height * canvas.Width * 4 * 10, // 1024,
+	ReadBufferSize:    canvas.Height * canvas.Width * 4 * 10, // 1024,
+	WriteBufferSize:   canvas.Height * canvas.Width * 4 * 10, // 1024,
+	EnableCompression: true,
 }
