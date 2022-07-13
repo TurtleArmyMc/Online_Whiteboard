@@ -253,8 +253,14 @@ const uint8ToBase64 = function (array) {
 }
 
 /** @param {string} s */
-const base64ToUint8 = s => new Uint8ClampedArray(atob(s).split("").map((c) => c.charCodeAt(0)));
-
+const base64ToUint8 = function (s) {
+    let decoded = atob(s);
+    let array = new Uint8ClampedArray(decoded.length);
+    for (let i = 0; i < decoded.length; i++) {
+        array[i] = decoded.charCodeAt(i);
+    }
+    return array;
+}
 /**
  * Encodes image data into base 64 to allow for JSON serialization
  * @param {ImageData} image
