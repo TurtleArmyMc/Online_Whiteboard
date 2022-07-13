@@ -20,8 +20,8 @@ func (layerType c2sCreatePacket) Handle(layers *layer.Manager, users *user.Manag
 	if err != nil {
 		return nil, err
 	}
-	layers.Add(layer)
-	if err := users.SendToAll(NewS2CCreatePacket(layer, 0)); err != nil {
+	height := layers.Add(layer)
+	if err := users.SendToAll(NewS2CCreatePacket(layer, height)); err != nil {
 		return nil, err
 	}
 	if err := users.SendToAll(layer.InitPacket()); err != nil {

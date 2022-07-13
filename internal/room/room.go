@@ -29,13 +29,8 @@ func New() *Room {
 		canvas.NewWhite(canvas.Height, canvas.Width),
 		make(chan user.Connection, 8),
 		make(chan *message, 256),
-
-		// comm.NewUserManager(),
-
 		&layer.Manager{},
 		user.NewManager(),
-		// conn.NewManager(),
-
 		true,
 	}
 
@@ -104,15 +99,17 @@ func (room *Room) setupNewConnection(c user.Connection) error {
 		if err != nil {
 			return err
 		}
+
+		height := room.layers.Add(l)
+
 		// Inform other connections of new layer
-		if err := room.users.SendFrom(layerpackets.NewS2CCreatePacket(l, 0), c); err != nil {
+		if err := room.users.SendFrom(layerpackets.NewS2CCreatePacket(l, height), c); err != nil {
 			return err
 		}
 		if err := room.users.SendFrom(l.InitPacket(), c); err != nil {
 			return err
 		}
 
-		room.layers.Add(l)
 	}
 
 	// Inform connection of all existing layers

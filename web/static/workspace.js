@@ -156,6 +156,7 @@ class LayerSelector {
 
 const Layers = {
     activeLayer: null,
+    // Sorted from top to bottom. Height 0 is the top layer
     layers: [],
     idToLayer: {},
 
@@ -179,10 +180,11 @@ const Layers = {
     // Draw all layer canvases and layer selectors
     displayLayers: function () {
         let mainDisplay = document.getElementById("main_display");
-        mainDisplay.replaceChildren(...this.layers.map(layer => layer.canvas));
+        // Topmost children must come last
+        mainDisplay.replaceChildren(...this.layers.map(layer => layer.canvas).reverse());
 
         let layerSelector = document.getElementById("layer_list");
-        layerSelector.replaceChildren(...this.layers.map(layer => new LayerSelector(layer).htmlElement).reverse());
+        layerSelector.replaceChildren(...this.layers.map(layer => new LayerSelector(layer).htmlElement));
     },
 
     // Can be called locally or prompted by server

@@ -3,7 +3,7 @@ package layer
 import "github.com/turtlearmy/online-whiteboard/internal/user"
 
 type Manager struct {
-	// Stored in order of bottom to top
+	// Stored in order of top to bottom. Height 0 is the top layer
 	Layers []Layer
 
 	nextId Id
@@ -38,18 +38,20 @@ func (layers *Manager) GetAtHeight(i int) Layer {
 	return layers.Layers[i]
 }
 
-func (layers *Manager) Add(layer Layer) {
-	layers.Insert(layer, 0)
+// Adds a layer at the bottom. Returns height the layer was added at
+func (layers *Manager) Add(layer Layer) int {
+	layers.Layers = append(layers.Layers, layer)
+	return len(layers.Layers) - 1
 }
 
-// returns if insert was within bounds
+// returns if insert was within bounds. 0 is the top height
 func (layers *Manager) Insert(layer Layer, height int) bool {
-	// Insert can be at the before existing layers or on top of them all
+	// Insert can be on top of existing layers or below them all
 	if !layers.validHeight(height) && height != len(layers.Layers) {
 		return false
 	}
 
-	// Extend number of layers by 1 and move all layers up level
+	// Extend number of layers by 1 and move all layers down a level
 	layers.Layers = append(layers.Layers, nil)
 	for j := len(layers.Layers) - 1; j > height; j-- {
 		layers.Layers[j] = layers.Layers[j-1]
