@@ -10,6 +10,7 @@ import (
 	layerpackets "github.com/turtlearmy/online-whiteboard/internal/layer/packets"
 	"github.com/turtlearmy/online-whiteboard/internal/layer/paintlayer"
 	"github.com/turtlearmy/online-whiteboard/internal/layer/paintlayer/canvas"
+	_ "github.com/turtlearmy/online-whiteboard/internal/layer/textlayer" // Needs to be imported to register layer and its packet
 	"github.com/turtlearmy/online-whiteboard/internal/user"
 )
 

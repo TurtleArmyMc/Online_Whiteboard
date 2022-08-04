@@ -72,6 +72,10 @@ class PaintLayer {
         this.canvas.height = CANVAS_HEIGHT;
     }
 
+    onSetActive() {
+        document.getElementById("paint_layer_controls").style.display = "block";
+    }
+
     drawLine(x1, y1, x2, y2) {
         /** @type {CanvasRenderingContext2D} */
         let ctx = this.canvas.getContext("2d");
@@ -121,6 +125,85 @@ class PaintLayer {
     static type = "paint_layer";
 }
 
+class TextLayer {
+    constructor(id, owner) {
+        this.id = id;
+        this.owner = owner;
+
+        this.canvas = document.createElement("canvas");
+        this.canvas.width = CANVAS_WIDTH;
+        this.canvas.height = CANVAS_HEIGHT;
+
+        this.textInfo = null;
+    }
+
+    onSetActive() {
+        document.getElementById("text_layer_controls").style.display = "block";
+        this.updateTextLayerControls();
+    }
+
+    /**
+     *
+     * @param {Object} textInfo
+     * @param {number} textInfo.x
+     * @param {number} textInfo.y
+     * @param {number} textInfo.font_size
+     * @param {string} textInfo.text_content
+     */
+    setTextInfo(textInfo) {
+        this.clearCanvas();
+
+        let ctx = this.canvas.getContext("2d");
+        ctx.font = `${textInfo.font_size}px serif`;
+        ctx.fillText(textInfo.text_content, textInfo.x, textInfo.y);
+
+        this.textInfo = textInfo;
+        if (Layers.activeLayer === this) this.updateTextLayerControls();
+    }
+
+    clearCanvas() {
+        if (this.textInfo === null) return;
+        let ctx = this.canvas.getContext("2d");
+        // TODO: Only clear necessary portion of canvas
+        ctx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+    }
+
+    updateTextLayerControls() {
+        if (this.textInfo === null) return;
+        document.getElementById("text_x").value = this.textInfo.x;
+        document.getElementById("text_y").value = this.textInfo.y;
+        document.getElementById("text_font_size").value = this.textInfo.font_size;
+        document.getElementById("text_content").value = this.textInfo.text_content;
+    }
+
+    sendSetInfoPacket(textInfo) {
+        let packet = {
+            "type": PACKET_TEXT_LAYER_SET,
+            "data": {
+                text: textInfo,
+                layer: this.id,
+            },
+        };
+        Socket.send(JSON.stringify(packet));
+    }
+
+    static updateActive() {
+        if (!(Layers.activeLayer instanceof TextLayer)) {
+            throw 'active layer is not a TextLayer';
+        }
+        let textInfo = {
+            x: Math.floor(document.getElementById("text_x").value),
+            y: Math.floor(document.getElementById("text_y").value),
+            font_size: Math.floor(document.getElementById("text_font_size").value),
+            text_content: document.getElementById("text_content").value,
+        };
+        Layers.activeLayer.setTextInfo(textInfo);
+        Layers.activeLayer.sendSetInfoPacket(textInfo);
+    }
+
+    static type = "text_layer";
+}
+
 // Used to display layer info and switch between active layers
 class LayerSelector {
     constructor(layer) {
@@ -145,7 +228,7 @@ class LayerSelector {
                 let checked = this.checked;
                 document.getElementById("layer_list").childNodes.forEach(c => c.firstChild.checked = false);
                 this.checked = checked;
-                Layers.activeLayer = checked ? layer : null;
+                Layers.setActiveLayer(checked ? layer : null);
             }
             this.htmlElement.appendChild(this.checkbox);
         }
@@ -161,6 +244,12 @@ const Layers = {
     idToLayer: {},
 
     _layersChangeEvent: new EventListener(),
+
+    setActiveLayer: function (layer) {
+        [...document.getElementsByClassName("layer_controls")].forEach(e => e.style.removeProperty("display"));
+        layer.onSetActive && layer.onSetActive();
+        this.activeLayer = layer;
+    },
 
     // Gets layer with id if type matches
     getChecked: function (id, type) {
@@ -199,13 +288,15 @@ const Layers = {
         }
     },
 
-    // Always called locally and informs server of change
+    // Called locally and informs server of change
     deleteActiveLayer: function () {
         if (this.activeLayer != null) {
             let packet = {
                 'type': PACKET_DELETE_LAYER,
                 'data': this.activeLayer.id,
             };
+            // FIXME: Causes race condition with desynced layer heights between
+            // client and server
             this.deleteLayer(this.activeLayer.id);
             Socket.send(JSON.stringify(packet));
         }
@@ -291,7 +382,8 @@ const decodeImageData = function (img) {
 
 // Maps layer type names to their class
 const LayerTypes = {
-    [PaintLayer.type]: PaintLayer
+    [PaintLayer.type]: PaintLayer,
+    [TextLayer.type]: TextLayer,
 };
 
 // Packet types
@@ -303,6 +395,7 @@ const PACKET_S2C_CREATE_LAYER = "s2c_create_layer";
 const PACKET_DELETE_LAYER = "delete_layer";
 const PACKET_PAINT_LAYER_SET = "paint_layer_set";
 const PACKET_PAINT_LAYER_DRAW = "paint_layer_draw";
+const PACKET_TEXT_LAYER_SET = "text_layer_set";
 
 // Handle received packets
 const S2CPacketHandlers = {
@@ -319,7 +412,7 @@ const S2CPacketHandlers = {
         }
         let layer = new constructor(data.id, data.owner);
         // Automatically select new layer if no layer is currently selected
-        if (Layers.activeLayer === null && layer.owner === LocalUserId) Layers.activeLayer = layer;
+        if (Layers.activeLayer === null && layer.owner === LocalUserId) Layers.setActiveLayer(layer);
         Layers.insertLayer(data.height, layer);
     },
 
@@ -337,6 +430,10 @@ const S2CPacketHandlers = {
         let imageData = decodeImageData(data.image);
         let ctx = layer.canvas.getContext("2d");
         ctx.putImageData(imageData, data.pos.x, data.pos.y);
+    },
+
+    [PACKET_TEXT_LAYER_SET]: data => {
+        Layers.getChecked(data.layer, TextLayer).setTextInfo(data.text);
     },
 }
 

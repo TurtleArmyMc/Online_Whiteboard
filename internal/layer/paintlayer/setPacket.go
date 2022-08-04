@@ -27,7 +27,7 @@ func (packet *setPacket) Handle(layers *layer.Manager, users *user.Manager, send
 	if l.Owner() != sender {
 		return nil, fmt.Errorf("user %d attempted to set contents of layer owned by user %d", sender, l.Owner())
 	}
-	paintLayer, ok := l.(*paint_layer)
+	paintLayer, ok := l.(*paintLayer)
 	if !ok {
 		return nil, fmt.Errorf("can not paint on layer of type '%s'", l.LayerType())
 	}

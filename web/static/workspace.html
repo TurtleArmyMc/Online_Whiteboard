@@ -46,6 +46,10 @@
             display: flex;
             flex-direction: row;
         }
+
+        .layer_controls {
+            display: none;
+        }
     </style>
 </head>
 <body>
@@ -53,24 +57,51 @@
     <br>
     <div id="main_display"></div>
     <div id="sidebar">
-        <div id="layer_list"></div>
-        <button onclick="if (Layers.activeLayer != null) Layers.deleteActiveLayer()">Delete layer</button>
-        <button onclick="Layers.sendCreatePacket(PaintLayer.type)">Create layer</button>
-        <br>
-        <div id="color_preview"></div>
-        <div>Red</div>
-        <input type="range" min="0" max="255" value="0" id="red" oninput="Brush.updateSettings()">
-        <div>Green</div>
-        <input type="range" min="0" max="255" value="0" id="green" oninput="Brush.updateSettings()">
-        <div>Blue</div>
-        <input type="range" min="0" max="255" value="0" id="blue" oninput="Brush.updateSettings()">
-        <div>Brush size</div>
-        <input type="range" min="1" max="200" value="15" id="brush_size" oninput="Brush.updateSettings()">
-        <p>Tool:</p>
-        <select id="tool_select" onchange="CurrentTool = Tools[this.value]">
-            <option value="PEN">Pen</option>
-            <option value="ERASER">Eraser</option>
-        </select>
+        <div id="layer_manager">
+            <div id="layer_list"></div>
+            <button onclick="if (Layers.activeLayer != null) Layers.deleteActiveLayer()">Delete layer</button>
+            <button onclick="Layers.sendCreatePacket(PaintLayer.type)">Create paint layer</button>
+            <button onclick="Layers.sendCreatePacket(TextLayer.type)">Create text layer</button>
+            <br>
+        </div>
+
+        <div id="paint_layer_controls" class="layer_controls">
+            <div id="color_picker">
+                <div id="color_preview"></div>
+                <div>Red</div>
+                <input type="range" min="0" max="255" value="0" id="red" oninput="Brush.updateSettings()">
+                <div>Green</div>
+                <input type="range" min="0" max="255" value="0" id="green" oninput="Brush.updateSettings()">
+                <div>Blue</div>
+                <input type="range" min="0" max="255" value="0" id="blue" oninput="Brush.updateSettings()">
+            </div>
+
+            <div id="brush_controls">
+                <div>Brush size</div>
+                <input type="range" min="1" max="200" value="15" id="brush_size" oninput="Brush.updateSettings()">
+                <br>
+            </div>
+
+            <p>Tool:</p>
+            <select id="tool_select" onchange="CurrentTool = Tools[this.value]">
+                <option value="PEN">Pen</option>
+                <option value="ERASER">Eraser</option>
+            </select>
+        </div>
+
+        <div id="text_layer_controls" class="layer_controls">
+            <div id="text_controls">
+                <div>Text X</div>
+                <input type="range" min="0" max="1920" id="text_x" oninput="TextLayer.updateActive()">
+                <div>Text Y</div>
+                <input type="range" min="0" max="1080" id="text_y" oninput="TextLayer.updateActive()">
+                <div>Font size</div>
+                <input type="range" min="30" max="500" id="text_font_size" oninput="TextLayer.updateActive()">
+                <div>Text Content</div>
+                <input type="text" id="text_content" oninput="TextLayer.updateActive()">
+                <br>
+            </div>
+        </div>
     </div>
     <br>
 </body>
