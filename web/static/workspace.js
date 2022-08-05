@@ -38,7 +38,7 @@ const Usernames = {
 
     setNames: function (names) {
         this.names = names;
-        this.updateNameDisplay(null, null);
+        this.updateNameDisplay();
         this._nameChangeEvent.call(null, null);
     },
 
@@ -48,7 +48,7 @@ const Usernames = {
         this._nameChangeEvent.call(user, name);
     },
 
-    updateNameDisplay: function (..._) {
+    updateNameDisplay: function () {
         document.getElementById("name_display").value = this.getName(LocalUserId);
     },
 
@@ -288,16 +288,14 @@ const Layers = {
         }
     },
 
-    // Called locally and informs server of change
+    // Requests server to delete layer. Done to prevent desync between heights
+    // on client and server
     deleteActiveLayer: function () {
         if (this.activeLayer != null) {
             let packet = {
-                'type': PACKET_DELETE_LAYER,
+                'type': PACKET_C2S_DELETE_LAYER,
                 'data': this.activeLayer.id,
             };
-            // FIXME: Causes race condition with desynced layer heights between
-            // client and server
-            this.deleteLayer(this.activeLayer.id);
             Socket.send(JSON.stringify(packet));
         }
     },
@@ -392,7 +390,8 @@ const PACKET_MAP_USERNAMES = "map_usernames";
 const PACKET_SET_USERNAME = "set_username";
 const PACKET_C2S_CREATE_LAYER = "c2s_create_layer";
 const PACKET_S2C_CREATE_LAYER = "s2c_create_layer";
-const PACKET_DELETE_LAYER = "delete_layer";
+const PACKET_C2S_DELETE_LAYER = "c2s_delete_layer";
+const PACKET_S2C_DELETE_LAYER = "s2c_delete_layer";
 const PACKET_PAINT_LAYER_SET = "paint_layer_set";
 const PACKET_PAINT_LAYER_DRAW = "paint_layer_draw";
 const PACKET_TEXT_LAYER_SET = "text_layer_set";
@@ -416,7 +415,7 @@ const S2CPacketHandlers = {
         Layers.insertLayer(data.height, layer);
     },
 
-    [PACKET_DELETE_LAYER]: Layers.deleteLayer.bind(Layers),
+    [PACKET_S2C_DELETE_LAYER]: Layers.deleteLayer.bind(Layers),
 
     [PACKET_PAINT_LAYER_SET]: data => {
         let layer = Layers.getChecked(data.layer, PaintLayer);
