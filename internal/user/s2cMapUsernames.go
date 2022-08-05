@@ -7,8 +7,5 @@ func (packet mapNamesPacket) PacketType() string {
 }
 
 func (users *Manager) NewMapNamesPacket() OutgoingPacket {
-	users.mu.RLock()
-	defer users.mu.RUnlock()
-
 	return mapNamesPacket(users.names)
 }

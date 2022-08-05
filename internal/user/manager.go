@@ -2,9 +2,6 @@ package user
 
 import (
 	"fmt"
-	"sync"
-
-	"github.com/gorilla/websocket"
 )
 
 type Manager struct {
@@ -15,10 +12,6 @@ type Manager struct {
 	nextConnId  connectionId
 
 	names map[Id]string
-
-	// Sessions, users and connections can be modified at any moment by new
-	// websockets being created, so a mutex is necessary
-	mu sync.RWMutex
 }
 
 func NewManager() *Manager {
@@ -26,9 +19,6 @@ func NewManager() *Manager {
 }
 
 func (users *Manager) ForSession(session Session) Id {
-	users.mu.Lock()
-	defer users.mu.Unlock()
-
 	if u, ok := users.sessions[session]; ok {
 		return u
 	}
@@ -38,45 +28,31 @@ func (users *Manager) ForSession(session Session) Id {
 	return users.nextUserId
 }
 
-func (users *Manager) AddConnection(ws *websocket.Conn, u Id) Connection {
-	users.mu.Lock()
-	defer users.mu.Unlock()
+func (users *Manager) AddConnection(req ConnectionRequest) Connection {
+	u := users.ForSession(req.session)
 
 	users.nextConnId++ // Start ids at 1 and not 0
 	id := users.nextConnId
 
-	outgoing := make(chan []byte, 64)
-
-	c := Connection{outgoing, u, id}
+	c := Connection{req.outgoing, u, id}
 
 	users.connections[c.id] = c
 
-	// Write outgoing messages
-	go func() {
-		for msg := range outgoing {
-			ws.WriteMessage(websocket.TextMessage, msg)
-		}
-	}()
+	// Send connection handle to where the connection was created
+	req.receiveConn <- c
 
 	return c
 }
 
 func (users *Manager) RemoveConnection(c Connection) {
-	users.mu.Lock()
 	delete(users.connections, c.id)
-	users.mu.Unlock()
 }
 
 func (users *Manager) ConnectionCount() int {
-	users.mu.RLock()
-	defer users.mu.RUnlock()
 	return len(users.connections)
 }
 
 func (users *Manager) Online(u Id) bool {
-	users.mu.RLock()
-	defer users.mu.RUnlock()
-
 	for _, c := range users.connections {
 		if u == c.User {
 			return true
@@ -86,9 +62,6 @@ func (users *Manager) Online(u Id) bool {
 }
 
 func (users *Manager) Name(user Id) string {
-	users.mu.RLock()
-	defer users.mu.RUnlock()
-
 	if name, ok := users.names[user]; ok {
 		return name
 	}
@@ -96,9 +69,7 @@ func (users *Manager) Name(user Id) string {
 }
 
 func (users *Manager) SetName(user Id, name string) {
-	users.mu.Lock()
 	users.names[user] = name
-	users.mu.Unlock()
 }
 
 func (users *Manager) SendToAll(packet OutgoingPacket) error {
@@ -107,26 +78,23 @@ func (users *Manager) SendToAll(packet OutgoingPacket) error {
 		return err
 	}
 
-	users.mu.RLock()
 	for _, connection := range users.connections {
 		connection.outgoing <- data
 	}
-	users.mu.RUnlock()
 	return nil
 }
 
+// Broadcast packet to all but the sender
 func (users *Manager) SendFrom(packet OutgoingPacket, sender Connection) error {
 	data, err := serializePacket(packet)
 	if err != nil {
 		return err
 	}
 
-	users.mu.RLock()
 	for id, connection := range users.connections {
 		if id != sender.id {
 			connection.outgoing <- data
 		}
 	}
-	users.mu.RUnlock()
 	return nil
 }

@@ -16,8 +16,9 @@ import (
 
 type Room struct {
 	currentCanvas    canvas.Canvas
-	newConnections   chan user.Connection
 	incomingMessages chan *message
+	connRequests     chan user.ConnectionRequest
+	closeConns       chan user.Connection
 
 	layers *layer.Manager
 	users  *user.Manager
@@ -28,8 +29,9 @@ type Room struct {
 func New() *Room {
 	room := &Room{
 		canvas.NewWhite(canvas.Height, canvas.Width),
-		make(chan user.Connection, 8),
 		make(chan *message, 256),
+		make(chan user.ConnectionRequest, 8),
+		make(chan user.Connection, 8),
 		&layer.Manager{},
 		user.NewManager(),
 		true,
@@ -41,22 +43,32 @@ func New() *Room {
 }
 
 func (room *Room) WsHandler(writer http.ResponseWriter, req *http.Request, session user.Session) {
-	conn, err := room.addConnection(writer, req, session)
+	err := room.addConnection(writer, req, session)
 	if err != nil {
 		log.Printf("error adding websocket connection: %v\n", err)
 		return
 	}
-	room.newConnections <- *conn
 }
 
-func (room *Room) addConnection(writer http.ResponseWriter, req *http.Request, session user.Session) (*user.Connection, error) {
+func (room *Room) addConnection(writer http.ResponseWriter, req *http.Request, session user.Session) error {
 	ws, err := wsupgrader.Upgrade(writer, req, nil)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	u := room.users.ForSession(session)
-	c := room.users.AddConnection(ws, u)
+	outgoing := make(chan []byte, 256)
+
+	// Write outgoing messages
+	go func() {
+		for msg := range outgoing {
+			ws.WriteMessage(websocket.TextMessage, msg)
+		}
+	}()
+
+	// Register and receive handle to connection
+	receiveConn := make(chan user.Connection)
+	room.connRequests <- user.NewConnectionRequest(outgoing, session, receiveConn)
+	connHandle := <-receiveConn
 
 	// Read incoming messages
 	go func() {
@@ -72,18 +84,21 @@ func (room *Room) addConnection(writer http.ResponseWriter, req *http.Request, s
 				if packet, err := c2s.Deserialize(msgData); err != nil {
 					log.Printf("error decoding incoming packet: %v\n", err)
 				} else {
-					room.incomingMessages <- &message{packet, c}
+					room.incomingMessages <- &message{packet, connHandle}
 				}
 			}
 		}
 
-		room.removeConnection(c)
+		// Send connection to be closed when done receiving messages
+		room.closeConns <- connHandle
 	}()
 
-	return &c, nil
+	return nil
 }
 
-func (room *Room) setupNewConnection(c user.Connection) error {
+func (room *Room) setupNewConnection(req user.ConnectionRequest) error {
+	c := room.users.AddConnection(req)
+
 	// Send user id to client
 	if err := c.Send(user.SetUserIdPacket(c.User)); err != nil {
 		return err
@@ -135,12 +150,14 @@ func (room *Room) removeConnection(c user.Connection) {
 func (room *Room) handleEvents() {
 	for room.open {
 		select {
-		case conn := <-room.newConnections:
+		case conn := <-room.connRequests:
 			if err := room.setupNewConnection(conn); err != nil {
 				if err != nil {
 					log.Printf("error setting up new connection: %v\n", err)
 				}
 			}
+		case conn := <-room.closeConns:
+			room.removeConnection(conn)
 		case msg := <-room.incomingMessages:
 			broadcast, err := msg.Packet.Handle(room.layers, room.users, msg.Sender.User)
 			if err != nil {
