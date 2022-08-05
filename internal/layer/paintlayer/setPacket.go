@@ -1,8 +1,6 @@
 package paintlayer
 
 import (
-	"fmt"
-
 	"github.com/turtlearmy/online-whiteboard/internal/c2s"
 	"github.com/turtlearmy/online-whiteboard/internal/layer"
 	"github.com/turtlearmy/online-whiteboard/internal/layer/paintlayer/canvas"
@@ -23,15 +21,10 @@ func (*setPacket) PacketType() string {
 }
 
 func (packet *setPacket) Handle(layers *layer.Manager, users *user.Manager, sender user.Id) (user.OutgoingPacket, error) {
-	l := layers.Get(packet.LayerId)
-	if l.Owner() != sender {
-		return nil, fmt.Errorf("user %d attempted to set contents of layer owned by user %d", sender, l.Owner())
+	paintLayer, _, err := layer.GetOwnedOfType[*paintLayer](layers, packet.LayerId, sender, "set contents of")
+	if err != nil {
+		return nil, err
 	}
-	paintLayer, ok := l.(*paintLayer)
-	if !ok {
-		return nil, fmt.Errorf("can not paint on layer of type '%s'", l.LayerType())
-	}
-
 	image, err := packet.Image.Decode()
 	if err != nil {
 		return nil, err

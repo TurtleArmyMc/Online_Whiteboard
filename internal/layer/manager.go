@@ -1,6 +1,10 @@
 package layer
 
-import "github.com/turtlearmy/online-whiteboard/internal/user"
+import (
+	"fmt"
+
+	"github.com/turtlearmy/online-whiteboard/internal/user"
+)
 
 type Manager struct {
 	// Stored in order of top to bottom. Height 0 is the top layer
@@ -17,18 +21,24 @@ func (layers *Manager) TotalCount() int {
 	return len(layers.Layers)
 }
 
-func (layers *Manager) Get(id Id) Layer {
-	layer, _ := layers.GetWithHeight(id)
-	return layer
-}
-
-func (layers *Manager) GetWithHeight(id Id) (Layer, int) {
+func (layers *Manager) Get(id Id) (l Layer, height int) {
 	for height, layer := range layers.Layers {
 		if id == layer.Id() {
 			return layer, height
 		}
 	}
-	return nil, -1
+	return nil, 0
+}
+
+func (layers *Manager) GetOwned(id Id, owner user.Id, action string) (l Layer, height int, err error) {
+	l, height = layers.Get(id)
+	if l == nil {
+		return nil, 0, fmt.Errorf("user %d attempted to %s non-existant layer %d", owner, action, id)
+	}
+	if l.Owner() != owner {
+		return nil, 0, fmt.Errorf("user %d attempted to %s layer %d owned by user %d", owner, action, id, l.Owner())
+	}
+	return
 }
 
 func (layers *Manager) GetAtHeight(i int) Layer {
@@ -63,7 +73,7 @@ func (layers *Manager) Insert(layer Layer, height int) bool {
 
 // returns whether remove was successful
 func (layers *Manager) Remove(id Id) bool {
-	layer, height := layers.GetWithHeight(id)
+	layer, height := layers.Get(id)
 	if layer == nil {
 		return false
 	}
@@ -83,4 +93,17 @@ func (layers *Manager) OwnedLayers(u user.Id) []Layer {
 		}
 	}
 	return ret
+}
+
+func GetOwnedOfType[T Layer](layers *Manager, id Id, owner user.Id, action string) (l T, height int, err error) {
+	var gotLayer Layer
+	gotLayer, height, err = layers.GetOwned(id, owner, action)
+	if err != nil {
+		return
+	}
+	l, ok := gotLayer.(T)
+	if !ok {
+		err = fmt.Errorf("user %d attempted to %s %s %d, but got a %s", owner, action, l.LayerType(), id, gotLayer.LayerType())
+	}
+	return
 }

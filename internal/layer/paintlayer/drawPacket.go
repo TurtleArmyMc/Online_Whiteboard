@@ -2,7 +2,6 @@ package paintlayer
 
 import (
 	"encoding/json"
-	"fmt"
 
 	"github.com/turtlearmy/online-whiteboard/internal/c2s"
 	"github.com/turtlearmy/online-whiteboard/internal/layer"
@@ -25,15 +24,10 @@ func (packet *DrawPacket) PacketType() string {
 }
 
 func (packet *DrawPacket) Handle(layers *layer.Manager, users *user.Manager, sender user.Id) (user.OutgoingPacket, error) {
-	l := layers.Get(packet.Layer)
-	if l.Owner() != sender {
-		return nil, fmt.Errorf("user %d attempted to paint on layer owned by user %d", sender, l.Owner())
+	paintLayer, _, err := layer.GetOwnedOfType[*paintLayer](layers, packet.Layer, sender, "paint on")
+	if err != nil {
+		return nil, err
 	}
-	paintLayer, ok := l.(*paintLayer)
-	if !ok {
-		return nil, fmt.Errorf("can not paint on layer of type '%s'", l.LayerType())
-	}
-
 	image, err := packet.Image.Decode()
 	if err != nil {
 		return nil, err
@@ -42,7 +36,6 @@ func (packet *DrawPacket) Handle(layers *layer.Manager, users *user.Manager, sen
 		return nil, err
 	}
 	return packet, nil
-
 }
 
 func (packet *DrawPacket) Encoded() ([]byte, error) {

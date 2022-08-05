@@ -1,8 +1,6 @@
 package textlayer
 
 import (
-	"fmt"
-
 	"github.com/turtlearmy/online-whiteboard/internal/c2s"
 	"github.com/turtlearmy/online-whiteboard/internal/layer"
 	"github.com/turtlearmy/online-whiteboard/internal/user"
@@ -22,16 +20,10 @@ func (*setPacket) PacketType() string {
 }
 
 func (packet *setPacket) Handle(layers *layer.Manager, users *user.Manager, sender user.Id) (user.OutgoingPacket, error) {
-	l := layers.Get(packet.LayerId)
-	if l.Owner() != sender {
-		return nil, fmt.Errorf("user %d attempted to set contents of layer owned by user %d", sender, l.Owner())
-	}
-
-	textLayer, ok := l.(*textLayer)
-	if !ok {
-		return nil, fmt.Errorf("can not set text for layer of type '%s'", l.LayerType())
+	textLayer, _, err := layer.GetOwnedOfType[*textLayer](layers, packet.LayerId, sender, "set contents of")
+	if err != nil {
+		return nil, err
 	}
 	textLayer.Text = packet.Text
-
 	return packet, nil
 }
