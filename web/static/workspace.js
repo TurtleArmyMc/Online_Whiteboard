@@ -74,6 +74,7 @@ class PaintLayer {
 
     onSetActive() {
         document.getElementById("paint_layer_controls").style.display = "block";
+        CurrentTool = Tools[document.getElementById("paint_tool_select").value];
     }
 
     drawLine(x1, y1, x2, y2) {
@@ -139,6 +140,7 @@ class TextLayer {
 
     onSetActive() {
         document.getElementById("text_layer_controls").style.display = "block";
+        CurrentTool = Tools.MOVE;
         this.updateTextLayerControls();
     }
 
@@ -159,6 +161,12 @@ class TextLayer {
 
         this.textInfo = textInfo;
         if (Layers.activeLayer === this) this.updateTextLayerControls();
+    }
+
+    move(deltaX, deltaY) {
+        this.textInfo.x += deltaX;
+        this.textInfo.y += deltaY;
+        this.setTextInfo(this.textInfo);
     }
 
     clearCanvas() {
@@ -204,6 +212,8 @@ class TextLayer {
     static type = "text_layer";
 }
 
+var HideLayerControls = () => [...document.getElementsByClassName("layer_controls")].forEach(e => e.style.removeProperty("display"));
+
 // Used to display layer info and switch between active layers
 class LayerSelector {
     constructor(layer) {
@@ -225,6 +235,9 @@ class LayerSelector {
             this.checkbox.id = checkboxId;
             this.checkbox.checked = layer == Layers.activeLayer;
             this.checkbox.onchange = function (e) {
+                // Clear visible controls when switching layers. Layers will
+                // make their relevant controls visible
+                HideLayerControls();
                 let checked = this.checked;
                 document.getElementById("layer_list").childNodes.forEach(c => c.firstChild.checked = false);
                 this.checked = checked;
@@ -246,7 +259,6 @@ const Layers = {
     _layersChangeEvent: new EventListener(),
 
     setActiveLayer: function (layer) {
-        [...document.getElementsByClassName("layer_controls")].forEach(e => e.style.removeProperty("display"));
         layer.onSetActive && layer.onSetActive();
         this.activeLayer = layer;
     },
@@ -577,14 +589,26 @@ class Brush {
 // Updates to current slider settings and updates color preview display
 Brush.updateSettings();
 
+const MoveTool = {
+    /** @param {MouseEvent} e */
+    onmousemove(e) {
+        let mouseDown = !!(e.buttons & 1);
+        if (mouseDown && Layers.activeLayer instanceof TextLayer) {
+            let move = getCanvasPos(e, Layers.activeLayer.canvas);
+            Layers.activeLayer.move(move.movementX, move.movementY);
+        }
+    }
+}
+
 // Tools are used to handle how mouse events should affect the canvas
 const Tools = {
     PEN: new Brush(),
     ERASER: new Brush("destination-out"),
+    MOVE: MoveTool,
 };
 
 // The global current tool. Initialized from tool dropdown chooser
-var CurrentTool = Tools[document.getElementById("tool_select").value];
+var CurrentTool = null;
 
 // Create handlers to call current tool functions on mouse events
 {
