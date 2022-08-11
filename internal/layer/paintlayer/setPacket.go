@@ -3,7 +3,7 @@ package paintlayer
 import (
 	"github.com/turtlearmy/online-whiteboard/internal/c2s"
 	"github.com/turtlearmy/online-whiteboard/internal/layer"
-	"github.com/turtlearmy/online-whiteboard/internal/layer/paintlayer/canvas"
+	"github.com/turtlearmy/online-whiteboard/internal/layer/canvas"
 	"github.com/turtlearmy/online-whiteboard/internal/user"
 )
 
