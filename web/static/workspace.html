@@ -8,27 +8,62 @@
     <link rel='stylesheet' type='text/css' media='screen' href='main.css'>
     <script defer src='workspace.js'></script>
     <style>
-        #main_display {
+        body {
+            margin-top: 2.5em;
+        }
+
+        #user_header {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 1.5em;
+            padding-left: 8px;
+            padding-right: 8px;
+            padding-top: 0.25em;
+            padding-bottom: 0.25em;
+            display: flex;
+            flex-direction: row;
+        }
+
+        #online_user_list {
+            flex-grow: 1;
+            display: flex;
+            flex-direction: row-reverse;
+            margin-right: 8px;
+        }
+
+        #online_user_list div {
+            border-radius: 25px;
+            background-color: lightgrey;
+            margin-right: 0.5em;
+            padding-left: 0.5em;
+            padding-right: 0.5em;
+        }
+
+        #main_content {
+            display: flex;
+            flex-direction: row;
+        }
+
+        #canvas_display {
             cursor: crosshair;
             border: 1px;
             border-color: red;
             border-style: solid;
-            max-width: min(80vw, 1920px);
-            max-height: min(95vh, 1080px);
+            width: min(80vw, 1920px);
+            height: min(90vh, 1080px);
             aspect-ratio: 16/9;
         }
 
-        #main_display canvas {
+        #canvas_display canvas {
             position: absolute;
-            max-width: min(80vw, 1920px);
-            max-height: min(95vh, 1080px);
+            width: min(80vw, 1920px);
+            height: min(90vh, 1080px);
             aspect-ratio: 16/9;
         }
 
         #sidebar {
-            position: absolute;
-            top: 0;
-            right: 1vw;
             max-width: 15vw;
             margin-left: 1vw;
         }
@@ -53,56 +88,61 @@
     </style>
 </head>
 <body>
-    <input id="name_display" type="text" onchange="Usernames.setLocalName(this.value)">
-    <br>
-    <div id="main_display"></div>
-    <div id="sidebar">
-        <div id="layer_manager">
-            <div id="layer_list"></div>
-            <button onclick="if (Layers.activeLayer != null) Layers.deleteActiveLayer()">Delete layer</button>
-            <button onclick="Layers.sendCreatePacket(PaintLayer.type)">Create paint layer</button>
-            <button onclick="Layers.sendCreatePacket(TextLayer.type)">Create text layer</button>
-            <br>
+    <div id="user_header">
+        <input id="name_display" type="text" onchange="Usernames.setLocalName(this.value)">
+        <div id="online_user_list">
+            <div>USERS</div>
         </div>
-
-        <div id="paint_layer_controls" class="layer_controls">
-            <div id="color_picker">
-                <div id="color_preview"></div>
-                <div>Red</div>
-                <input type="range" min="0" max="255" value="0" id="red" oninput="Brush.updateSettings()">
-                <div>Green</div>
-                <input type="range" min="0" max="255" value="0" id="green" oninput="Brush.updateSettings()">
-                <div>Blue</div>
-                <input type="range" min="0" max="255" value="0" id="blue" oninput="Brush.updateSettings()">
-            </div>
-
-            <div id="brush_controls">
-                <div>Brush size</div>
-                <input type="range" min="1" max="200" value="15" id="brush_size" oninput="Brush.updateSettings()">
+    </div>
+    <div id="main_content">
+        <div id="canvas_display"></div>
+        <div id="sidebar">
+            <div id="layer_manager">
+                <div id="layer_list"></div>
+                <button onclick="if (Layers.activeLayer != null) Layers.deleteActiveLayer()">Delete layer</button>
+                <button onclick="Layers.sendCreatePacket(PaintLayer.type)">Create paint layer</button>
+                <button onclick="Layers.sendCreatePacket(TextLayer.type)">Create text layer</button>
                 <br>
             </div>
 
-            <p>Tool:</p>
-            <select id="paint_tool_select" onchange="CurrentTool = Tools[this.value]">
-                <option value="PEN">Pen</option>
-                <option value="ERASER">Eraser</option>
-            </select>
-        </div>
+            <div id="paint_layer_controls" class="layer_controls">
+                <div id="color_picker">
+                    <div id="color_preview"></div>
+                    <div>Red</div>
+                    <input type="range" min="0" max="255" value="0" id="red" oninput="Brush.updateSettings()">
+                    <div>Green</div>
+                    <input type="range" min="0" max="255" value="0" id="green" oninput="Brush.updateSettings()">
+                    <div>Blue</div>
+                    <input type="range" min="0" max="255" value="0" id="blue" oninput="Brush.updateSettings()">
+                </div>
 
-        <div id="text_layer_controls" class="layer_controls">
-            <div id="text_controls">
-                <div>Text X</div>
-                <input type="range" min="0" max="1920" id="text_x" oninput="TextLayer.updateActive()">
-                <div>Text Y</div>
-                <input type="range" min="0" max="1080" id="text_y" oninput="TextLayer.updateActive()">
-                <div>Font size</div>
-                <input type="range" min="30" max="500" id="text_font_size" oninput="TextLayer.updateActive()">
-                <div>Text Content</div>
-                <input type="text" id="text_content" oninput="TextLayer.updateActive()">
-                <br>
+                <div id="brush_controls">
+                    <div>Brush size</div>
+                    <input type="range" min="1" max="200" value="15" id="brush_size" oninput="Brush.updateSettings()">
+                    <br>
+                </div>
+
+                <p>Tool:</p>
+                <select id="paint_tool_select" onchange="CurrentTool = Tools[this.value]">
+                    <option value="PEN">Pen</option>
+                    <option value="ERASER">Eraser</option>
+                </select>
+            </div>
+
+            <div id="text_layer_controls" class="layer_controls">
+                <div id="text_controls">
+                    <div>Text X</div>
+                    <input type="range" min="0" max="1920" id="text_x" oninput="TextLayer.updateActive()">
+                    <div>Text Y</div>
+                    <input type="range" min="0" max="1080" id="text_y" oninput="TextLayer.updateActive()">
+                    <div>Font size</div>
+                    <input type="range" min="30" max="500" id="text_font_size" oninput="TextLayer.updateActive()">
+                    <div>Text Content</div>
+                    <input type="text" id="text_content" oninput="TextLayer.updateActive()">
+                    <br>
+                </div>
             </div>
         </div>
     </div>
-    <br>
 </body>
 </html>

@@ -95,7 +95,14 @@ func (room *Room) addConnection(writer http.ResponseWriter, req *http.Request, s
 }
 
 func (room *Room) setupNewConnection(req user.ConnectionRequest) error {
+	previouslyOnline := room.users.OnlineUsers()
+
 	c := room.users.AddConnection(req)
+
+	if onlineUsers := room.users.OnlineUsers(); len(previouslyOnline) != len(onlineUsers) {
+		// Inform existing connections that user is now online
+		room.users.SendFrom(onlineUsers, c)
+	}
 
 	// Send user id to client
 	if err := c.Send(user.SetUserIdPacket(c.User)); err != nil {
@@ -104,6 +111,11 @@ func (room *Room) setupNewConnection(req user.ConnectionRequest) error {
 
 	// Send usernames to client
 	if err := c.Send(room.users.NewMapNamesPacket()); err != nil {
+		return err
+	}
+
+	// Send list of which users are online to client
+	if err := c.Send(room.users.OnlineUsers()); err != nil {
 		return err
 	}
 
@@ -140,6 +152,13 @@ func (room *Room) setupNewConnection(req user.ConnectionRequest) error {
 
 func (room *Room) removeConnection(c user.Connection) {
 	room.users.RemoveConnection(c)
+
+	// Send online users if this was a user's last connection
+	if !room.users.Online(c.User) {
+		if err := room.users.SendToAll(room.users.OnlineUsers()); err != nil {
+			log.Printf("error broadcasting disconnect notification packet: %v\n", err)
+		}
+	}
 	if room.users.ConnectionCount() == 0 {
 		// TODO: Remove room when empty
 	}

@@ -58,6 +58,37 @@ const Usernames = {
     },
 };
 
+const OnlineUsers = {
+    users: new Set(),
+
+    _onlineChangeEvent: new EventListener(),
+
+    set(users) {
+        this.users = new Set(users);
+        this.updateOnlineUserDisplay();
+    },
+
+    // Displays online users in the top right corner of the screen
+    updateOnlineUserDisplay() {
+        let sortedUsers = [...this.users];
+        sortedUsers.sort();
+
+        document.getElementById("online_user_list").replaceChildren(
+            ...sortedUsers.map(uid => {
+                let div = document.createElement("div");
+                div.innerText = Usernames.getName(uid);
+                return div;
+            }
+            ));
+    },
+
+    /** @param {function():void} callback */
+    addOnlineChangeCallback: function (callback) {
+        this._onlineChangeEvent.register(callback);
+    },
+}
+Usernames.addNameChangeCallback((user, name) => OnlineUsers.updateOnlineUserDisplay());
+
 const CANVAS_WIDTH = 1920;
 const CANVAS_HEIGHT = 1080;
 
@@ -227,7 +258,6 @@ class LayerSelector {
         this.htmlElement = document.createElement("div");
 
         this.label = document.createElement("label");
-        console.log(layer);
         this.label.innerText = `${layer.displayName}: ${Usernames.getName(layer.owner)}`;
 
         // Only add checkbox and event for selecting layers that user owns
@@ -285,9 +315,9 @@ const Layers = {
 
     // Draw all layer canvases and layer selectors
     displayLayers: function () {
-        let mainDisplay = document.getElementById("main_display");
+        let canvasDisplay = document.getElementById("canvas_display");
         // Topmost children must come last
-        mainDisplay.replaceChildren(...this.layers.map(layer => layer.canvas).reverse());
+        canvasDisplay.replaceChildren(...this.layers.map(layer => layer.canvas).reverse());
 
         let layerSelector = document.getElementById("layer_list");
         layerSelector.replaceChildren(...this.layers.map(layer => new LayerSelector(layer).htmlElement));
@@ -334,7 +364,7 @@ const Layers = {
 Layers.addLayerChangeCallback(Layers.displayLayers.bind(Layers));
 // Layers selectors must be redrawn to display owner names correctly when a
 // name is changed
-Usernames.addNameChangeCallback((user, name) => Layers.displayLayers(null, null));
+Usernames.addNameChangeCallback((user, name) => Layers.displayLayers());
 
 /** @type {WebSocket} */
 var Socket;
@@ -405,6 +435,7 @@ const LayerTypes = {
 const PACKET_SET_USER_ID = "set_uid";
 const PACKET_MAP_USERNAMES = "map_usernames";
 const PACKET_SET_USERNAME = "set_username";
+const PACKET_SET_ONLINE_USERS = "set_online_users";
 const PACKET_C2S_CREATE_LAYER = "c2s_create_layer";
 const PACKET_S2C_CREATE_LAYER = "s2c_create_layer";
 const PACKET_C2S_DELETE_LAYER = "c2s_delete_layer";
@@ -420,6 +451,8 @@ const S2CPacketHandlers = {
     [PACKET_MAP_USERNAMES]: Usernames.setNames.bind(Usernames),
 
     [PACKET_SET_USERNAME]: data => Usernames.setName(data.id, data.name),
+
+    [PACKET_SET_ONLINE_USERS]: OnlineUsers.set.bind(OnlineUsers),
 
     [PACKET_S2C_CREATE_LAYER]: data => {
         let constructor = LayerTypes[data.layer_type];
@@ -617,9 +650,9 @@ var CurrentTool = null;
 
 // Create handlers to call current tool functions on mouse events
 {
-    let mainDisplay = document.getElementById("main_display");
-    mainDisplay.onmousedown = (e) => CurrentTool && CurrentTool.onmousedown && CurrentTool.onmousedown(e);
-    mainDisplay.onmouseup = (e) => CurrentTool && CurrentTool.onmouseup && CurrentTool.onmouseup(e);
-    mainDisplay.onmouseleave = (e) => CurrentTool && CurrentTool.onmouseleave && CurrentTool.onmouseleave(e);
-    mainDisplay.onmousemove = (e) => CurrentTool && CurrentTool.onmousemove && CurrentTool.onmousemove(e);
+    let canvasDisplay = document.getElementById("canvas_display");
+    canvasDisplay.onmousedown = (e) => CurrentTool && CurrentTool.onmousedown && CurrentTool.onmousedown(e);
+    canvasDisplay.onmouseup = (e) => CurrentTool && CurrentTool.onmouseup && CurrentTool.onmouseup(e);
+    canvasDisplay.onmouseleave = (e) => CurrentTool && CurrentTool.onmouseleave && CurrentTool.onmouseleave(e);
+    canvasDisplay.onmousemove = (e) => CurrentTool && CurrentTool.onmousemove && CurrentTool.onmousemove(e);
 }

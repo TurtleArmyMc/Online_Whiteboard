@@ -61,6 +61,18 @@ func (users *Manager) Online(u Id) bool {
 	return false
 }
 
+func (users *Manager) OnlineUsers() OnlineUserIdsPacket {
+	onlineSet := map[Id]bool{}
+	for _, c := range users.connections {
+		onlineSet[c.User] = true
+	}
+	onlineUsers := make([]Id, 0, len(onlineSet))
+	for id := range onlineSet {
+		onlineUsers = append(onlineUsers, id)
+	}
+	return onlineUsers
+}
+
 func (users *Manager) Name(user Id) string {
 	if name, ok := users.names[user]; ok {
 		return name
