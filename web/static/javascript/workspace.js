@@ -39,20 +39,20 @@ const Usernames = {
     setNames: function (names) {
         this.names = names;
         this.updateNameDisplay();
-        this._nameChangeEvent.call(null, null);
+        this._nameChangeEvent.call();
     },
 
     setName: function (user, name) {
         this.names[user] = name;
-        this.updateNameDisplay(user, name);
-        this._nameChangeEvent.call(user, name);
+        this.updateNameDisplay();
+        this._nameChangeEvent.call();
     },
 
     updateNameDisplay: function () {
         document.getElementById("name_display").value = this.getName(LocalUserId);
     },
 
-    /** @param {function(?number,?string):void} callback */
+    /** @param {function():void} callback */
     addNameChangeCallback: function (callback) {
         this._nameChangeEvent.register(callback);
     },
@@ -70,8 +70,7 @@ const OnlineUsers = {
 
     // Displays online users in the top right corner of the screen
     updateOnlineUserDisplay() {
-        let sortedUsers = [...this.users];
-        sortedUsers.sort();
+        let sortedUsers = [...this.users].sort();
 
         document.getElementById("online_user_list").replaceChildren(
             ...sortedUsers.map(uid => {
@@ -87,7 +86,7 @@ const OnlineUsers = {
         this._onlineChangeEvent.register(callback);
     },
 }
-Usernames.addNameChangeCallback((user, name) => OnlineUsers.updateOnlineUserDisplay());
+Usernames.addNameChangeCallback(OnlineUsers.updateOnlineUserDisplay.bind(OnlineUsers));
 
 const CANVAS_WIDTH = 1920;
 const CANVAS_HEIGHT = 1080;
@@ -364,7 +363,7 @@ const Layers = {
 Layers.addLayerChangeCallback(Layers.displayLayers.bind(Layers));
 // Layers selectors must be redrawn to display owner names correctly when a
 // name is changed
-Usernames.addNameChangeCallback((user, name) => Layers.displayLayers());
+Usernames.addNameChangeCallback(Layers.displayLayers.bind(Layers));
 
 /** @type {WebSocket} */
 var Socket;

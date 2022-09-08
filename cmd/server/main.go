@@ -1,11 +1,14 @@
 package main
 
 import (
+	"net/http"
+
 	"github.com/gin-gonic/gin"
 	"github.com/turtlearmy/online-whiteboard/internal/room"
 	"github.com/turtlearmy/online-whiteboard/internal/user"
 )
 
+// Gets the session cookie for the request, setting it if necessary
 func getSession(c *gin.Context) user.Session {
 	session, err := c.Cookie("session")
 	if err != nil {
@@ -21,7 +24,9 @@ func main() {
 	r := gin.Default()
 	r.StaticFile("/", "web/static/index.html")
 	r.StaticFile("/workspace.html", "web/static/workspace.html")
-	r.StaticFile("/workspace.js", "web/static/workspace.js")
+
+	r.StaticFS("/javascript", http.Dir("web/static/javascript"))
+	r.StaticFS("/css", http.Dir("web/static/css"))
 
 	// Set session cookie for all connections
 	r.Use(func(c *gin.Context) {
