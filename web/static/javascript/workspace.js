@@ -198,9 +198,11 @@ class TextLayer {
     }
 
     move(deltaX, deltaY) {
-        this.textInfo.x += deltaX;
-        this.textInfo.y += deltaY;
+        // FIXME: Rounding can cause text to drift away from the cursor
+        this.textInfo.x = Math.round(this.textInfo.x + deltaX);
+        this.textInfo.y = Math.round(this.textInfo.y + deltaY);
         this.setTextInfo(this.textInfo);
+        this.sendSetInfoPacket(this.textInfo);
     }
 
     clearCanvas() {
