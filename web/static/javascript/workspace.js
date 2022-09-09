@@ -101,7 +101,7 @@ class PaintLayer {
         this.canvas.width = CANVAS_WIDTH;
         this.canvas.height = CANVAS_HEIGHT;
 
-        this.displayName = "Canvas";
+        this.displayIconUrl = "icons/brush_black_24dp.svg";
     }
 
     onSetActive() {
@@ -169,7 +169,7 @@ class TextLayer {
 
         this.textInfo = null;
 
-        this.displayName = "Text";
+        this.displayIconUrl = "icons/text_fields_black_24dp.svg"
     }
 
     onSetActive() {
@@ -257,9 +257,15 @@ class LayerSelector {
         this.owner = layer.owner;
 
         this.htmlElement = document.createElement("div");
+        this.htmlElement.className = "layer_selector";
 
         this.label = document.createElement("label");
-        this.label.innerText = `${layer.displayName}: ${Usernames.getName(layer.owner)}`;
+        let labelIcon = document.createElement("img");
+        labelIcon.src = layer.displayIconUrl;
+        this.label.appendChild(labelIcon);
+        let labelOwnerDisplay = document.createElement("div");
+        labelOwnerDisplay.innerText = `${Usernames.getName(layer.owner)}`;
+        this.label.appendChild(labelOwnerDisplay);
 
         // Only add checkbox and event for selecting layers that user owns
         if (LocalUserId === layer.owner) {

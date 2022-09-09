@@ -65,7 +65,12 @@ body {
     background-color: #000000;
 }
 
-#layer_list>div {
+.layer_selector {
+    display: flex;
+    flex-direction: row;
+}
+
+.layer_selector>label {
     display: flex;
     flex-direction: row;
 }
