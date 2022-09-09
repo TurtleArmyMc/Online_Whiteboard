@@ -21,10 +21,19 @@
         <div id="sidebar">
             <div id="layer_manager">
                 <div id="layer_list"></div>
-                <button onclick="if (Layers.activeLayer != null) Layers.deleteActiveLayer()">Delete layer</button>
-                <button onclick="Layers.create(PaintLayer.type)">Create paint layer</button>
-                <button onclick="Layers.create(TextLayer.type)">Create text layer</button>
+                <button onclick="Layers.create(PaintLayer.type)">
+                    <img src="icons/brush_black_24dp.svg" title="Create paint layer">
+                </button>
+                <button onclick="Layers.create(TextLayer.type)">
+                    <img src="icons/text_fields_black_24dp.svg" title="Create text layer">
+                </button>
                 <br>
+            </div>
+
+            <div id="layer_owner_controls" class="layer_controls">
+                <button onclick="if (Layers.activeLayer != null) Layers.deleteActiveLayer()">
+                    <img src="icons/delete_black_24dp.svg" title="Delete layer">
+                </button>
             </div>
 
             <div id="paint_layer_controls" class="layer_controls">

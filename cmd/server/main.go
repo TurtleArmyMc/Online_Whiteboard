@@ -27,6 +27,7 @@ func main() {
 
 	r.StaticFS("/javascript", http.Dir("web/static/javascript"))
 	r.StaticFS("/css", http.Dir("web/static/css"))
+	r.StaticFS("/icons", http.Dir("web/static/icons"))
 
 	// Set session cookie for all connections
 	r.Use(func(c *gin.Context) {

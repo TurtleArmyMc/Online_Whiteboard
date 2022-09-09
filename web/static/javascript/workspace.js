@@ -301,7 +301,9 @@ const Layers = {
         HideLayerControls();
 
         if (layer != null) {
-            // Show layer controls
+            // Show generic layer controls
+            document.getElementById("layer_owner_controls").style.display = "block";
+            // Show layer specific controls
             layer.onSetActive && layer.onSetActive();
         }
 
