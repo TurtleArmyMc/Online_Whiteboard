@@ -271,12 +271,13 @@ class LayerSelector {
             this.checkbox.id = checkboxId;
             this.checkbox.checked = layer == Layers.activeLayer;
             this.checkbox.onchange = function (e) {
-                // Clear visible controls when switching layers. Layers will
-                // make their relevant controls visible
-                HideLayerControls();
+                // Keep track of if this layer should be checked
                 let checked = this.checked;
+                // Uncheck all layers
                 document.getElementById("layer_list").childNodes.forEach(c => c.firstChild.checked = false);
+                // Check this layer if it should still be checked
                 this.checked = checked;
+
                 Layers.setActiveLayer(checked ? layer : null);
             }
             this.htmlElement.appendChild(this.checkbox);
@@ -295,7 +296,15 @@ const Layers = {
     _layersChangeEvent: new EventListener(),
 
     setActiveLayer: function (layer) {
-        layer.onSetActive && layer.onSetActive();
+        // Clear visible controls when switching layers. Layers will
+        // make their relevant controls visible
+        HideLayerControls();
+
+        if (layer != null) {
+            // Show layer controls
+            layer.onSetActive && layer.onSetActive();
+        }
+
         this.activeLayer = layer;
     },
 
@@ -330,7 +339,9 @@ const Layers = {
         if (layer != undefined) {
             delete this.idToLayer[id];
             this.layers.splice(this.layers.findIndex(l => l.id === id), 1);
-            if (this.activeLayer.id === id) this.activeLayer = null;
+            if (this.activeLayer && this.activeLayer.id === id) {
+                this.setActiveLayer(null);
+            }
 
             this._layersChangeEvent.call();
         }
@@ -346,6 +357,11 @@ const Layers = {
             };
             Socket.send(JSON.stringify(packet));
         }
+    },
+
+    create: function(type) {
+        this.setActiveLayer(null);
+        this.sendCreatePacket(type);
     },
 
     // Requests server to create new layer of type

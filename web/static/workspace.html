@@ -22,8 +22,8 @@
             <div id="layer_manager">
                 <div id="layer_list"></div>
                 <button onclick="if (Layers.activeLayer != null) Layers.deleteActiveLayer()">Delete layer</button>
-                <button onclick="Layers.sendCreatePacket(PaintLayer.type)">Create paint layer</button>
-                <button onclick="Layers.sendCreatePacket(TextLayer.type)">Create text layer</button>
+                <button onclick="Layers.create(PaintLayer.type)">Create paint layer</button>
+                <button onclick="Layers.create(TextLayer.type)">Create text layer</button>
                 <br>
             </div>
 
