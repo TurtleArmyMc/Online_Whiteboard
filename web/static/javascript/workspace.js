@@ -101,7 +101,7 @@ class PaintLayer {
         this.canvas.width = CANVAS_WIDTH;
         this.canvas.height = CANVAS_HEIGHT;
 
-        this.displayIconUrl = "icons/brush_black_24dp.svg";
+        this.displayIconUrl = "icons/palette_black_24dp.svg";
     }
 
     onSetActive() {

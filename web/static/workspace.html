@@ -22,12 +22,11 @@
             <div id="layer_manager">
                 <div id="layer_list"></div>
                 <button onclick="Layers.create(PaintLayer.type)">
-                    <img src="icons/brush_black_24dp.svg" title="Create paint layer">
+                    <img src="icons/palette_black_24dp.svg" title="Create paint layer">
                 </button>
                 <button onclick="Layers.create(TextLayer.type)">
                     <img src="icons/text_fields_black_24dp.svg" title="Create text layer">
                 </button>
-                <br>
             </div>
 
             <div id="layer_owner_controls" class="layer_controls">
@@ -50,7 +49,6 @@
                 <div id="brush_controls">
                     <div>Brush size</div>
                     <input type="range" min="1" max="200" value="15" id="brush_size" oninput="Brush.updateSettings()">
-                    <br>
                 </div>
 
                 <p>Tool:</p>
@@ -70,7 +68,6 @@
                     <input type="range" min="30" max="500" id="text_font_size" oninput="TextLayer.updateActive()">
                     <div>Text Content</div>
                     <input type="text" id="text_content" oninput="TextLayer.updateActive()">
-                    <br>
                 </div>
             </div>
         </div>

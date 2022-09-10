@@ -29,6 +29,10 @@ body {
     margin-right: 0.5em;
     padding-left: 0.5em;
     padding-right: 0.5em;
+
+    max-width: 10em;
+    overflow-x: hidden;
+    white-space: nowrap;
 }
 
 #main_content {
@@ -37,10 +41,6 @@ body {
 }
 
 #canvas_display {
-    cursor: crosshair;
-    border: 1px;
-    border-color: red;
-    border-style: solid;
     width: min(80vw, 1920px);
     aspect-ratio: 16/9;
 }
@@ -48,11 +48,15 @@ body {
 #canvas_display canvas {
     position: absolute;
     max-width: min(80vw, 1920px);
+    cursor: crosshair;
+    border: 1px;
+    border-color: black;
+    border-style: solid;
     aspect-ratio: 16/9;
 }
 
 #sidebar {
-    max-width: 15vw;
+    width: 15vw;
     margin-left: 1vw;
 }
 
@@ -65,14 +69,34 @@ body {
     background-color: #000000;
 }
 
-.layer_selector {
-    display: flex;
-    flex-direction: row;
+.layer_controls {
+    margin-bottom: 1em;
+}
+
+#layer_list {
+    margin-bottom: 1em;
+}
+
+.layer_selector>input {
+    display: none;
 }
 
 .layer_selector>label {
     display: flex;
     flex-direction: row;
+
+    padding-left: 1em;
+    padding-top: 0.2em;
+    padding-bottom: 0.2em;
+    border-radius: 20px;
+
+    user-select: none;
+    overflow-x: hidden;
+    white-space: nowrap;
+}
+
+.layer_selector>input:checked + label {
+    background-color: lightgray;
 }
 
 .layer_controls {
