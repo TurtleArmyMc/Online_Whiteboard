@@ -73,7 +73,7 @@ const OnlineUsers = {
         let sortedUsers = [...this.users].sort();
 
         document.getElementById("online_user_list").replaceChildren(
-            ...sortedUsers.map(uid => {
+            ...sortedUsers.filter(uid => uid != LocalUserId).map(uid => {
                 let div = document.createElement("div");
                 div.innerText = Usernames.getName(uid);
                 return div;
@@ -105,8 +105,10 @@ class PaintLayer {
     }
 
     onSetActive() {
-        document.getElementById("paint_layer_controls").style.display = "block";
-        CurrentTool = Tools[document.getElementById("paint_tool_select").value];
+        if (this.owner === LocalUserId) {
+            document.getElementById("paint_layer_controls").style.display = "block";
+            CurrentTool = Tools[document.getElementById("paint_tool_select").value];
+        }
     }
 
     drawLine(x1, y1, x2, y2) {
@@ -173,9 +175,11 @@ class TextLayer {
     }
 
     onSetActive() {
-        document.getElementById("text_layer_controls").style.display = "block";
-        CurrentTool = Tools.MOVE;
-        this.updateTextLayerControls();
+        if (this.owner === LocalUserId) {
+            document.getElementById("text_layer_controls").style.display = "block";
+            CurrentTool = Tools.MOVE;
+            this.updateTextLayerControls();
+        }
     }
 
     /**
@@ -258,6 +262,9 @@ class LayerSelector {
 
         this.htmlElement = document.createElement("div");
         this.htmlElement.className = "layer_selector";
+        if (LocalUserId === layer.owner) {
+            this.htmlElement.classList.add("owned_layer_selector");
+        }
 
         this.label = document.createElement("label");
         let labelIcon = document.createElement("img");
@@ -267,28 +274,17 @@ class LayerSelector {
         labelOwnerDisplay.innerText = `${Usernames.getName(layer.owner)}`;
         this.label.appendChild(labelOwnerDisplay);
 
-        // Only add checkbox and event for selecting layers that user owns
-        if (LocalUserId === layer.owner) {
-            let checkboxId = `layer_selector_${layer.id}`;
-            this.label.setAttribute("for", checkboxId);
+        let radioId = `layer_selector_${layer.id}`;
+        this.label.setAttribute("for", radioId);
 
-            this.checkbox = document.createElement("input");
-            this.checkbox.type = "checkbox";
-            this.checkbox.id = checkboxId;
-            this.checkbox.checked = layer == Layers.activeLayer;
-            this.checkbox.onchange = function (e) {
-                // Keep track of if this layer should be checked
-                let checked = this.checked;
-                // Uncheck all layers
-                document.getElementById("layer_list").childNodes.forEach(c => c.firstChild.checked = false);
-                // Check this layer if it should still be checked
-                this.checked = checked;
+        this.radio = document.createElement("input");
+        this.radio.name = "selected_layer";
+        this.radio.type = "radio";
+        this.radio.id = radioId;
+        this.radio.checked = layer == Layers.activeLayer;
+        this.radio.onchange = (e) => Layers.setActiveLayer(this.radio.checked ? layer : null);
 
-                Layers.setActiveLayer(checked ? layer : null);
-            }
-            this.htmlElement.appendChild(this.checkbox);
-        }
-
+        this.htmlElement.appendChild(this.radio);
         this.htmlElement.appendChild(this.label);
     }
 }
@@ -309,8 +305,10 @@ const Layers = {
         if (layer === null) {
             CurrentTool = null;
         } else {
-            // Show generic layer controls
-            document.getElementById("layer_owner_controls").style.display = "block";
+            if (layer.owner === LocalUserId) {
+                // Show generic layer controls
+                document.getElementById("layer_owner_controls").style.display = "block";
+            }
             // Show layer specific controls
             layer.onSetActive && layer.onSetActive();
         }
@@ -369,7 +367,7 @@ const Layers = {
         }
     },
 
-    create: function(type) {
+    create: function (type) {
         this.setActiveLayer(null);
         this.sendCreatePacket(type);
     },

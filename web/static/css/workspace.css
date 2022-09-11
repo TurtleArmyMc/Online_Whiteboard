@@ -88,6 +88,7 @@ body {
     padding-left: 1em;
     padding-top: 0.2em;
     padding-bottom: 0.2em;
+    margin-bottom: 0.2em;
     border-radius: 20px;
 
     user-select: none;
@@ -97,6 +98,13 @@ body {
 
 .layer_selector>input:checked + label {
     background-color: lightgray;
+}
+
+.owned_layer_selector>label {
+    font-weight: bold;
+    border-color: gray;
+    border-width: 2px;
+    border-style: solid;
 }
 
 .layer_controls {
