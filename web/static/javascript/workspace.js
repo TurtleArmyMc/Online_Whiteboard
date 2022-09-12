@@ -306,9 +306,10 @@ const Layers = {
         // Hide layer controls
         [...document.getElementsByClassName("layer_controls")].forEach(e => e.style.removeProperty("display"));
 
-        if (this.activeLayer === null) {
+        if (this.activeLayer === null || this.activeLayer.owner != LocalUserId) {
             CurrentTool = null;
-        } else {
+        }
+        if (this.activeLayer != null) {
             // Show generic layer controls
             if (this.activeLayer.owner === 0) {
                 document.getElementById("layer_unowned_controls").style.display = "block";
@@ -651,6 +652,7 @@ class Brush {
 
     drawLine(x1, y1, x2, y2) {
         if (!(Layers.activeLayer instanceof PaintLayer)) return;
+        if (Layers.activeLayer.owner != LocalUserId) return;
 
         /** @type {CanvasRenderingContext2D} */
         let ctx = Layers.activeLayer.canvas.getContext("2d");
@@ -697,7 +699,7 @@ const MoveTool = {
     /** @param {MouseEvent} e */
     onmousemove(e) {
         let mouseDown = !!(e.buttons & 1);
-        if (mouseDown && Layers.activeLayer instanceof TextLayer) {
+        if (mouseDown && Layers.activeLayer instanceof TextLayer && Layers.activeLayer.owner === LocalUserId) {
             let move = getCanvasPos(e, Layers.activeLayer.canvas);
             Layers.activeLayer.move(move.movementX, move.movementY);
         }

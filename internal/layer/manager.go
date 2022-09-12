@@ -30,7 +30,16 @@ func (layers *Manager) Get(id Id) (l Layer, height int) {
 	return nil, 0
 }
 
+// Does not include unowned layers
 func (layers *Manager) GetOwned(id Id, owner user.Id, action string) (l Layer, height int, err error) {
+	l, height, err = layers.GetOwnedOrUnowned(id, owner, action)
+	if err == nil && l.Owner() == 0 {
+		return nil, 0, fmt.Errorf("user %d attempted to %s unowned layer %d", owner, action, id)
+	}
+	return
+}
+
+func (layers *Manager) GetOwnedOrUnowned(id Id, owner user.Id, action string) (l Layer, height int, err error) {
 	l, height = layers.Get(id)
 	if l == nil {
 		return nil, 0, fmt.Errorf("user %d attempted to %s non-existant layer %d", owner, action, id)

@@ -22,7 +22,7 @@ func (*setOwnerPacket) PacketType() string {
 }
 
 func (p *setOwnerPacket) Handle(layers *layer.Manager, users *user.Manager, sender user.Id) (user.OutgoingPacket, error) {
-	layer, _, err := layers.GetOwned(p.Layer, sender, "change owner of")
+	layer, _, err := layers.GetOwnedOrUnowned(p.Layer, sender, "change owner of")
 	if err != nil {
 		return nil, err
 	}
