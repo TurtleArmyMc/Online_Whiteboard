@@ -260,7 +260,9 @@ class LayerSelector {
 
         this.htmlElement = document.createElement("div");
         this.htmlElement.className = "layer_selector";
-        if (LocalUserId === layer.owner) {
+        if (layer.owner === 0) {
+            this.htmlElement.classList.add("unowned_layer_selector");
+        } else if (layer.owner === LocalUserId) {
             this.htmlElement.classList.add("owned_layer_selector");
         }
 

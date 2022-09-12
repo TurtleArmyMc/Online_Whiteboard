@@ -91,6 +91,9 @@ body {
     padding-bottom: 0.2em;
     margin-bottom: 0.2em;
     border-radius: 20px;
+    border-width: 2px;
+    border-style: solid;
+    border-color: transparent;
 
     user-select: none;
     overflow-x: hidden;
@@ -101,11 +104,14 @@ body {
     background-color: lightgray;
 }
 
-.owned_layer_selector>label {
+.layer_selector.owned_layer_selector>label {
     font-weight: bold;
     border-color: gray;
-    border-width: 2px;
-    border-style: solid;
+}
+
+.layer_selector.unowned_layer_selector>label {
+    color: gray;
+    font-style: italic;
 }
 
 .layer_controls {
