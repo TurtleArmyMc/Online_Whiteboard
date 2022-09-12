@@ -104,7 +104,7 @@ class PaintLayer {
         this.displayIconUrl = "icons/palette_black_24dp.svg";
     }
 
-    onSetActive() {
+    showLayerControls() {
         if (this.owner === LocalUserId) {
             document.getElementById("paint_layer_controls").style.display = "block";
             CurrentTool = Tools[document.getElementById("paint_tool_select").value];
@@ -174,7 +174,7 @@ class TextLayer {
         this.displayIconUrl = "icons/text_fields_black_24dp.svg"
     }
 
-    onSetActive() {
+    showLayerControls() {
         if (this.owner === LocalUserId) {
             document.getElementById("text_layer_controls").style.display = "block";
             CurrentTool = Tools.MOVE;
@@ -252,8 +252,6 @@ class TextLayer {
     static type = "text_layer";
 }
 
-var HideLayerControls = () => [...document.getElementsByClassName("layer_controls")].forEach(e => e.style.removeProperty("display"));
-
 // Used to display layer info and switch between active layers
 class LayerSelector {
     constructor(layer) {
@@ -271,7 +269,7 @@ class LayerSelector {
         labelIcon.src = layer.displayIconUrl;
         this.label.appendChild(labelIcon);
         let labelOwnerDisplay = document.createElement("div");
-        labelOwnerDisplay.innerText = `${Usernames.getName(layer.owner)}`;
+        labelOwnerDisplay.innerText = layer.owner != 0 ? Usernames.getName(layer.owner) : "Unowned";
         this.label.appendChild(labelOwnerDisplay);
 
         let radioId = `layer_selector_${layer.id}`;
@@ -298,22 +296,26 @@ const Layers = {
     _layersChangeEvent: new EventListener(),
 
     setActiveLayer: function (layer) {
-        // Clear visible controls when switching layers. Layers will
-        // make their relevant controls visible
-        HideLayerControls();
+        this.activeLayer = layer;
+        this.updateControls();
+    },
 
-        if (layer === null) {
+    updateControls: function () {
+        // Hide layer controls
+        [...document.getElementsByClassName("layer_controls")].forEach(e => e.style.removeProperty("display"));
+
+        if (this.activeLayer === null) {
             CurrentTool = null;
         } else {
-            if (layer.owner === LocalUserId) {
-                // Show generic layer controls
+            // Show generic layer controls
+            if (this.activeLayer.owner === 0) {
+                document.getElementById("layer_unowned_controls").style.display = "block";
+            } else if (this.activeLayer.owner === LocalUserId) {
                 document.getElementById("layer_owner_controls").style.display = "block";
             }
             // Show layer specific controls
-            layer.onSetActive && layer.onSetActive();
+            this.activeLayer.showLayerControls && this.activeLayer.showLayerControls();
         }
-
-        this.activeLayer = layer;
     },
 
     // Gets layer with id if type matches
@@ -362,6 +364,40 @@ const Layers = {
             let packet = {
                 'type': PACKET_C2S_DELETE_LAYER,
                 'data': this.activeLayer.id,
+            };
+            Socket.send(JSON.stringify(packet));
+        }
+    },
+
+    changeLayerOwner: function (layerId, newOwner) {
+        this.idToLayer[layerId].owner = newOwner;
+        if (this.activeLayer && this.activeLayer.id == layerId) {
+            this.updateControls();
+        }
+        this._layersChangeEvent.call();
+    },
+
+    requestFreeActiveLayer: function () {
+        if (this.activeLayer != null && this.activeLayer.owner === LocalUserId) {
+            let packet = {
+                'type': PACKET_SET_LAYER_OWNER,
+                'data': {
+                    layer: this.activeLayer.id,
+                    new_owner: 0,
+                },
+            };
+            Socket.send(JSON.stringify(packet));
+        }
+    },
+
+    requestClaimActiveLayer: function () {
+        if (this.activeLayer != null && this.activeLayer.owner === 0) {
+            let packet = {
+                'type': PACKET_SET_LAYER_OWNER,
+                'data': {
+                    layer: this.activeLayer.id,
+                    new_owner: LocalUserId,
+                },
             };
             Socket.send(JSON.stringify(packet));
         }
@@ -461,6 +497,7 @@ const PACKET_SET_USER_ID = "set_uid";
 const PACKET_MAP_USERNAMES = "map_usernames";
 const PACKET_SET_USERNAME = "set_username";
 const PACKET_SET_ONLINE_USERS = "set_online_users";
+const PACKET_SET_LAYER_OWNER = "set_layer_owner";
 const PACKET_C2S_CREATE_LAYER = "c2s_create_layer";
 const PACKET_S2C_CREATE_LAYER = "s2c_create_layer";
 const PACKET_C2S_DELETE_LAYER = "c2s_delete_layer";
@@ -478,6 +515,8 @@ const S2CPacketHandlers = {
     [PACKET_SET_USERNAME]: data => Usernames.setName(data.id, data.name),
 
     [PACKET_SET_ONLINE_USERS]: OnlineUsers.set.bind(OnlineUsers),
+
+    [PACKET_SET_LAYER_OWNER]: data => Layers.changeLayerOwner(data.layer, data.new_owner),
 
     [PACKET_S2C_CREATE_LAYER]: data => {
         let constructor = LayerTypes[data.layer_type];

@@ -35,7 +35,8 @@ func (layers *Manager) GetOwned(id Id, owner user.Id, action string) (l Layer, h
 	if l == nil {
 		return nil, 0, fmt.Errorf("user %d attempted to %s non-existant layer %d", owner, action, id)
 	}
-	if l.Owner() != owner {
+	// Unowned layers have an owner of 0
+	if l.Owner() != owner && l.Owner() != 0 {
 		return nil, 0, fmt.Errorf("user %d attempted to %s layer %d owned by user %d", owner, action, id, l.Owner())
 	}
 	return

@@ -20,16 +20,25 @@
         <div id="canvas_display"></div>
         <div id="sidebar">
             <div id="layer_manager">
-                <div id="layer_list"></div>
                 <button onclick="Layers.create(PaintLayer.type)">
                     <img src="icons/palette_black_24dp.svg" title="Create paint layer">
                 </button>
                 <button onclick="Layers.create(TextLayer.type)">
                     <img src="icons/text_fields_black_24dp.svg" title="Create text layer">
                 </button>
+                <div id="layer_list"></div>
+            </div>
+
+            <div id="layer_unowned_controls" class="layer_controls">
+                <button onclick="Layers.requestClaimActiveLayer()">
+                    <img src="icons/key_black_24dp.svg" title="Claim layer">
+                </button>
             </div>
 
             <div id="layer_owner_controls" class="layer_controls">
+                <button onclick="Layers.requestFreeActiveLayer()">
+                    <img src="icons/key_off_black_24dp.svg" title="Free layer">
+                </button>
                 <button onclick="if (Layers.activeLayer != null) Layers.deleteActiveLayer()">
                     <img src="icons/delete_black_24dp.svg" title="Delete layer">
                 </button>

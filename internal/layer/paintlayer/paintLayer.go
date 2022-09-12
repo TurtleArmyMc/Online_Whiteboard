@@ -9,13 +9,12 @@ import (
 const LAYER_TYPE layer.Type = "paint_layer"
 
 type paintLayer struct {
+	layer.LayerInfo
 	canvas canvas.Canvas
-	id     layer.Id
-	owner  user.Id
 }
 
 func NewPaintLayer(id layer.Id, owner user.Id) layer.Layer {
-	return &paintLayer{canvas.NewTransparent(canvas.Width, canvas.Height), id, owner}
+	return &paintLayer{layer.LayerInfo{id, owner}, canvas.NewTransparent(canvas.Width, canvas.Height)}
 }
 
 var _ = layer.Register(LAYER_TYPE, NewPaintLayer)
@@ -25,13 +24,5 @@ func (l *paintLayer) LayerType() layer.Type {
 }
 
 func (l *paintLayer) InitPacket() user.OutgoingPacket {
-	return &setPacket{l.canvas.Encode(), l.id}
-}
-
-func (l *paintLayer) Id() layer.Id {
-	return l.id
-}
-
-func (l *paintLayer) Owner() user.Id {
-	return l.owner
+	return &setPacket{l.canvas.Encode(), l.Id()}
 }
