@@ -40,8 +40,14 @@
                 <button onclick="Layers.requestFreeActiveLayer()">
                     <img src="icons/key_off_black_24dp.svg" title="Free layer">
                 </button>
-                <button onclick="if (Layers.activeLayer != null) Layers.deleteActiveLayer()">
+                <button onclick="if (Layers.activeLayer != null) Layers.requestDeleteActiveLayer()">
                     <img src="icons/delete_black_24dp.svg" title="Delete layer">
+                </button>
+                <button onclick="if (Layers.activeLayer != null) Layers.requestMoveActiveLayer(-1)">
+                    <img src="icons/arrow_upward_black_24dp.svg" title="Move layer up">
+                </button>
+                <button onclick="if (Layers.activeLayer != null) Layers.requestMoveActiveLayer(1)">
+                    <img src="icons/arrow_downward_black_24dp.svg" title="Move layer down">
                 </button>
             </div>
 

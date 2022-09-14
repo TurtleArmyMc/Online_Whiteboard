@@ -271,7 +271,7 @@ class LayerSelector {
         labelIcon.src = layer.displayIconUrl;
         this.label.appendChild(labelIcon);
         let labelOwnerDisplay = document.createElement("div");
-        labelOwnerDisplay.innerText = layer.owner != 0 ? Usernames.getName(layer.owner) : "Unowned";
+        labelOwnerDisplay.innerText = layer.owner != 0 ? Usernames.getName(layer.owner) : "Unowned layer";
         this.label.appendChild(labelOwnerDisplay);
 
         let radioId = `layer_selector_${layer.id}`;
@@ -336,6 +336,17 @@ const Layers = {
         this._layersChangeEvent.call();
     },
 
+    _removeLayer: function (id) {
+        delete this.idToLayer[id];
+        this.layers.splice(this.layers.findIndex(l => l.id === id), 1);
+    },
+
+    setHeight: function (id, height) {
+        let layer = this.idToLayer[id];
+        this._removeLayer(id);
+        this.insertLayer(height, layer);
+    },
+
     // Draw all layer canvases and layer selectors
     displayLayers: function () {
         let canvasDisplay = document.getElementById("canvas_display");
@@ -350,8 +361,7 @@ const Layers = {
     deleteLayer: function (id) {
         let layer = this.idToLayer[id];
         if (layer != undefined) {
-            delete this.idToLayer[id];
-            this.layers.splice(this.layers.findIndex(l => l.id === id), 1);
+            this._removeLayer(id);
             if (this.activeLayer && this.activeLayer.id === id) {
                 this.setActiveLayer(null);
             }
@@ -362,11 +372,24 @@ const Layers = {
 
     // Requests server to delete layer. Done to prevent desync between heights
     // on client and server
-    deleteActiveLayer: function () {
-        if (this.activeLayer != null) {
+    requestDeleteActiveLayer: function () {
+        if (this.activeLayer != null && this.activeLayer.owner === LocalUserId) {
             let packet = {
                 'type': PACKET_C2S_DELETE_LAYER,
                 'data': this.activeLayer.id,
+            };
+            Socket.send(JSON.stringify(packet));
+        }
+    },
+
+    requestMoveActiveLayer: function (moveBy) {
+        if (this.activeLayer != null && this.activeLayer.owner === LocalUserId) {
+            let packet = {
+                'type': PACKET_C2S_MOVE_LAYER,
+                'data': {
+                    layer: this.activeLayer.id,
+                    move_by: moveBy,
+                },
             };
             Socket.send(JSON.stringify(packet));
         }
@@ -505,6 +528,8 @@ const PACKET_C2S_CREATE_LAYER = "c2s_create_layer";
 const PACKET_S2C_CREATE_LAYER = "s2c_create_layer";
 const PACKET_C2S_DELETE_LAYER = "c2s_delete_layer";
 const PACKET_S2C_DELETE_LAYER = "s2c_delete_layer";
+const PACKET_C2S_MOVE_LAYER = "c2s_move_layer";
+const PACKET_S2C_LAYER_SET_HEIGHT = "s2c_set_layer_height";
 const PACKET_PAINT_LAYER_SET = "paint_layer_set";
 const PACKET_PAINT_LAYER_DRAW = "paint_layer_draw";
 const PACKET_TEXT_LAYER_SET = "text_layer_set";
@@ -533,6 +558,8 @@ const S2CPacketHandlers = {
     },
 
     [PACKET_S2C_DELETE_LAYER]: Layers.deleteLayer.bind(Layers),
+
+    [PACKET_S2C_LAYER_SET_HEIGHT]: data => Layers.setHeight(data.layer, data.height),
 
     [PACKET_PAINT_LAYER_SET]: data => {
         let layer = Layers.getChecked(data.layer, PaintLayer);
