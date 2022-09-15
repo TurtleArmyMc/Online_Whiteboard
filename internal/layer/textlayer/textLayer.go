@@ -1,6 +1,8 @@
 package textlayer
 
 import (
+	"fmt"
+
 	"github.com/turtlearmy/online-whiteboard/internal/layer"
 	"github.com/turtlearmy/online-whiteboard/internal/layer/canvas"
 	"github.com/turtlearmy/online-whiteboard/internal/user"
@@ -14,7 +16,14 @@ type textLayer struct {
 }
 
 func newTextLayer(id layer.Id, owner user.Id) layer.Layer {
-	return &textLayer{layer.LayerInfo{id, owner}, textInfo{canvas.Width / 2, canvas.Height / 2, 12, "Text"}}
+	return &textLayer{
+		layer.LayerInfo{
+			LayerId:    id,
+			LayerOwner: owner,
+			LayerName:  fmt.Sprintf("Text Layer %d", id),
+		},
+		textInfo{canvas.Width / 2, canvas.Height / 2, 12, "Text"},
+	}
 }
 
 var _ = layer.Register(LAYER_TYPE, newTextLayer)

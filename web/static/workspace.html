@@ -49,6 +49,7 @@
                 <button onclick="if (Layers.activeLayer != null) Layers.requestMoveActiveLayer(1)">
                     <img src="icons/arrow_downward_black_24dp.svg" title="Move layer down">
                 </button>
+                <input id="layer_name_editor" type="text" onchange="Layers.setActiveLayerName(this.value)">
             </div>
 
             <div id="paint_layer_controls" class="layer_controls">

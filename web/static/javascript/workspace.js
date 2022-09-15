@@ -93,9 +93,10 @@ const CANVAS_HEIGHT = 1080;
 
 // A layer that can be drawn on
 class PaintLayer {
-    constructor(id, owner) {
+    constructor(id, owner, name) {
         this.id = id;
         this.owner = owner;
+        this.name = name;
 
         this.canvas = document.createElement("canvas");
         this.canvas.width = CANVAS_WIDTH;
@@ -161,9 +162,10 @@ class PaintLayer {
 }
 
 class TextLayer {
-    constructor(id, owner) {
+    constructor(id, owner, name) {
         this.id = id;
         this.owner = owner;
+        this.name = name;
 
         this.canvas = document.createElement("canvas");
         this.canvas.width = CANVAS_WIDTH;
@@ -270,9 +272,20 @@ class LayerSelector {
         let labelIcon = document.createElement("img");
         labelIcon.src = layer.displayIconUrl;
         this.label.appendChild(labelIcon);
+
+        let labelDisplay = document.createElement("div");
+
+        let layerNameDisplay = document.createElement("div");
+        layerNameDisplay.className = "layer_name_display";
+        layerNameDisplay.innerText = layer.name;
+        labelDisplay.appendChild(layerNameDisplay);
+
         let labelOwnerDisplay = document.createElement("div");
+        labelOwnerDisplay.className = "layer_owner_display";
         labelOwnerDisplay.innerText = layer.owner != 0 ? Usernames.getName(layer.owner) : "Unowned layer";
-        this.label.appendChild(labelOwnerDisplay);
+        labelDisplay.appendChild(labelOwnerDisplay);
+
+        this.label.appendChild(labelDisplay);
 
         let radioId = `layer_selector_${layer.id}`;
         this.label.setAttribute("for", radioId);
@@ -315,6 +328,7 @@ const Layers = {
                 document.getElementById("layer_unowned_controls").style.display = "block";
             } else if (this.activeLayer.owner === LocalUserId) {
                 document.getElementById("layer_owner_controls").style.display = "block";
+                document.getElementById("layer_name_editor").value = this.activeLayer.name;
             }
             // Show layer specific controls
             this.activeLayer.showLayerControls && this.activeLayer.showLayerControls();
@@ -395,12 +409,37 @@ const Layers = {
         }
     },
 
-    changeLayerOwner: function (layerId, newOwner) {
+    setLayerOwner: function (layerId, newOwner) {
         this.idToLayer[layerId].owner = newOwner;
         if (this.activeLayer && this.activeLayer.id == layerId) {
             this.updateControls();
         }
         this._layersChangeEvent.call();
+    },
+
+    setLayerName: function(layerId, newName) {
+        this.idToLayer[layerId].name = newName;
+        if (this.activeLayer != null && this.activeLayer.id === layerId && this.activeLayer.owner === LocalUserId) {
+            // Update name changer if name change received from somewhere other
+            // than the name changer
+            let layerNameChanger = document.getElementById("layer_name_editor");
+            if (layerNameChanger.value != newName) layerNameChanger.value = newName;
+        }
+        this._layersChangeEvent.call();
+    },
+
+    setActiveLayerName: function(name) {
+        if (this.activeLayer === null || this.activeLayer.owner != LocalUserId) return;
+        this.setLayerName(this.activeLayer.id, name);
+        let packet = {
+            'type': PACKET_SET_LAYER_NAME,
+            'data': {
+                'layer': this.activeLayer.id,
+                'new_name': name,
+            },
+        };
+        Socket.send(JSON.stringify(packet));
+
     },
 
     requestFreeActiveLayer: function () {
@@ -430,6 +469,8 @@ const Layers = {
     },
 
     create: function (type) {
+        // Deselect current layer so that new layer will be automatically
+        // selected when created
         this.setActiveLayer(null);
         this.sendCreatePacket(type);
     },
@@ -524,6 +565,7 @@ const PACKET_MAP_USERNAMES = "map_usernames";
 const PACKET_SET_USERNAME = "set_username";
 const PACKET_SET_ONLINE_USERS = "set_online_users";
 const PACKET_SET_LAYER_OWNER = "set_layer_owner";
+const PACKET_SET_LAYER_NAME = "set_layer_name";
 const PACKET_C2S_CREATE_LAYER = "c2s_create_layer";
 const PACKET_S2C_CREATE_LAYER = "s2c_create_layer";
 const PACKET_C2S_DELETE_LAYER = "c2s_delete_layer";
@@ -544,14 +586,16 @@ const S2CPacketHandlers = {
 
     [PACKET_SET_ONLINE_USERS]: OnlineUsers.set.bind(OnlineUsers),
 
-    [PACKET_SET_LAYER_OWNER]: data => Layers.changeLayerOwner(data.layer, data.new_owner),
+    [PACKET_SET_LAYER_OWNER]: data => Layers.setLayerOwner(data.layer, data.new_owner),
+
+    [PACKET_SET_LAYER_NAME]: data => Layers.setLayerName(data.layer, data.new_name),
 
     [PACKET_S2C_CREATE_LAYER]: data => {
         let constructor = LayerTypes[data.layer_type];
         if (constructor === undefined) {
             throw (`error: unknown layer type "${data.layer_type}"`);
         }
-        let layer = new constructor(data.id, data.owner);
+        let layer = new constructor(data.id, data.owner, data.name);
         // Automatically select new layer if no layer is currently selected
         if (Layers.activeLayer === null && layer.owner === LocalUserId) Layers.setActiveLayer(layer);
         Layers.insertLayer(data.height, layer);

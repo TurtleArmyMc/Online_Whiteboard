@@ -100,18 +100,24 @@ body {
     white-space: nowrap;
 }
 
-.layer_selector>input:checked + label {
+.layer_selector>input:checked+label {
     background-color: lightgray;
 }
 
 .layer_selector.owned_layer_selector>label {
-    font-weight: bold;
     border-color: gray;
 }
 
-.layer_selector.unowned_layer_selector>label {
-    color: gray;
+.layer_selector.owned_layer_selector .layer_name_display {
+    font-weight: bold;
+}
+
+.unowned_layer_selector>label {
     font-style: italic;
+}
+
+.unowned_layer_selector .layer_owner_display {
+    color: gray;
 }
 
 .layer_controls {

@@ -11,6 +11,8 @@ type Layer interface {
 	Id() Id
 	Owner() user.Id // Unowned layers have an owner of 0
 	SetOwner(user user.Id)
+	Name() string
+	SetName(name string)
 }
 
 type Handler interface {
@@ -20,6 +22,7 @@ type Handler interface {
 type LayerInfo struct {
 	LayerId    Id
 	LayerOwner user.Id
+	LayerName  string
 }
 
 func (l *LayerInfo) Id() Id {
@@ -32,4 +35,12 @@ func (l *LayerInfo) Owner() user.Id {
 
 func (l *LayerInfo) SetOwner(user user.Id) {
 	l.LayerOwner = user
+}
+
+func (l *LayerInfo) Name() string {
+	return l.LayerName
+}
+
+func (l *LayerInfo) SetName(name string) {
+	l.LayerName = name
 }

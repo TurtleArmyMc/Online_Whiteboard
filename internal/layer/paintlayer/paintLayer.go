@@ -1,6 +1,8 @@
 package paintlayer
 
 import (
+	"fmt"
+
 	"github.com/turtlearmy/online-whiteboard/internal/layer"
 	"github.com/turtlearmy/online-whiteboard/internal/layer/canvas"
 	"github.com/turtlearmy/online-whiteboard/internal/user"
@@ -14,7 +16,14 @@ type paintLayer struct {
 }
 
 func NewPaintLayer(id layer.Id, owner user.Id) layer.Layer {
-	return &paintLayer{layer.LayerInfo{id, owner}, canvas.NewTransparent(canvas.Width, canvas.Height)}
+	return &paintLayer{
+		layer.LayerInfo{
+			LayerId:    id,
+			LayerOwner: owner,
+			LayerName:  fmt.Sprintf("Paint Layer %d", id),
+		},
+		canvas.NewTransparent(canvas.Width, canvas.Height),
+	}
 }
 
 var _ = layer.Register(LAYER_TYPE, NewPaintLayer)
