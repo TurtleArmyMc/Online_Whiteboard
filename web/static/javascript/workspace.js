@@ -102,7 +102,7 @@ class PaintLayer {
         this.canvas.width = CANVAS_WIDTH;
         this.canvas.height = CANVAS_HEIGHT;
 
-        this.displayIconUrl = "icons/palette_black_24dp.svg";
+        this.displayIconUrl = "/icons/palette_black_24dp.svg";
     }
 
     showLayerControls() {
@@ -173,7 +173,7 @@ class TextLayer {
 
         this.textInfo = null;
 
-        this.displayIconUrl = "icons/text_fields_black_24dp.svg"
+        this.displayIconUrl = "/icons/text_fields_black_24dp.svg"
     }
 
     showLayerControls() {
@@ -417,7 +417,7 @@ const Layers = {
         this._layersChangeEvent.call();
     },
 
-    setLayerName: function(layerId, newName) {
+    setLayerName: function (layerId, newName) {
         this.idToLayer[layerId].name = newName;
         if (this.activeLayer != null && this.activeLayer.id === layerId && this.activeLayer.owner === LocalUserId) {
             // Update name changer if name change received from somewhere other
@@ -428,7 +428,7 @@ const Layers = {
         this._layersChangeEvent.call();
     },
 
-    setActiveLayerName: function(name) {
+    setActiveLayerName: function (name) {
         if (this.activeLayer === null || this.activeLayer.owner != LocalUserId) return;
         this.setLayerName(this.activeLayer.id, name);
         let packet = {
@@ -468,7 +468,7 @@ const Layers = {
         }
     },
 
-    create: function (type) {
+    requestCreate: function (type) {
         // Deselect current layer so that new layer will be automatically
         // selected when created
         this.setActiveLayer(null);
@@ -497,7 +497,10 @@ Usernames.addNameChangeCallback(Layers.displayLayers.bind(Layers));
 /** @type {WebSocket} */
 var Socket;
 {
-    let url = new URL('/ws', window.location.href);
+    let path = window.location.href;
+    if (path.charAt(path.length - 1) != '/') path = path + '/';
+    path = path + "ws";
+    let url = new URL(path);
     url.protocol = url.protocol.replace('http', 'ws');
     Socket = new WebSocket(url.href);
 }
@@ -700,6 +703,7 @@ const getCanvasPos = function (e, canvas) {
 class Brush {
     /** @param {string} [compositeOperation=source-over] */
     constructor(compositeOperation) {
+        // Default to brushes being for drawing over the canvas contents
         this.compositeOperation = compositeOperation === undefined ? "source-over" : compositeOperation;
     }
 

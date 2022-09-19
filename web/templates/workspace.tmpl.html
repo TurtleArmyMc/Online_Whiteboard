@@ -3,11 +3,10 @@
 <head>
     <meta charset='utf-8'>
     <meta http-equiv='X-UA-Compatible' content='IE=edge'>
-    <title>Workspace</title>
+    <title>{{ .Name }}</title>
     <meta name='viewport' content='width=device-width, initial-scale=1'>
-    <link rel='stylesheet' type='text/css' media='screen' href='main.css'>
-    <script defer src='javascript/workspace.js'></script>
-    <link link rel="stylesheet" type="text/css" href="css/workspace.css">
+    <script defer src='/javascript/workspace.js'></script>
+    <link link rel="stylesheet" type="text/css" href="/css/workspace.css">
 </head>
 <body>
     <div id="user_header">
@@ -20,34 +19,34 @@
         <div id="canvas_display"></div>
         <div id="sidebar">
             <div id="layer_manager">
-                <img src="icons/add_circle_black_24dp.svg">
-                <button onclick="Layers.create(PaintLayer.type)">
-                    <img src="icons/palette_black_24dp.svg" title="Create paint layer">
+                <img src="/icons/add_circle_black_24dp.svg">
+                <button onclick="Layers.requestCreate(PaintLayer.type)">
+                    <img src="/icons/palette_black_24dp.svg" title="Create paint layer">
                 </button>
-                <button onclick="Layers.create(TextLayer.type)">
-                    <img src="icons/text_fields_black_24dp.svg" title="Create text layer">
+                <button onclick="Layers.requestCreate(TextLayer.type)">
+                    <img src="/icons/text_fields_black_24dp.svg" title="Create text layer">
                 </button>
                 <div id="layer_list"></div>
             </div>
 
             <div id="layer_unowned_controls" class="layer_controls">
                 <button onclick="Layers.requestClaimActiveLayer()">
-                    <img src="icons/key_black_24dp.svg" title="Claim layer">
+                    <img src="/icons/key_black_24dp.svg" title="Claim layer">
                 </button>
             </div>
 
             <div id="layer_owner_controls" class="layer_controls">
                 <button onclick="Layers.requestFreeActiveLayer()">
-                    <img src="icons/key_off_black_24dp.svg" title="Free layer">
+                    <img src="/icons/key_off_black_24dp.svg" title="Free layer">
                 </button>
                 <button onclick="if (Layers.activeLayer != null) Layers.requestDeleteActiveLayer()">
-                    <img src="icons/delete_black_24dp.svg" title="Delete layer">
+                    <img src="/icons/delete_black_24dp.svg" title="Delete layer">
                 </button>
                 <button onclick="if (Layers.activeLayer != null) Layers.requestMoveActiveLayer(-1)">
-                    <img src="icons/arrow_upward_black_24dp.svg" title="Move layer up">
+                    <img src="/icons/arrow_upward_black_24dp.svg" title="Move layer up">
                 </button>
                 <button onclick="if (Layers.activeLayer != null) Layers.requestMoveActiveLayer(1)">
-                    <img src="icons/arrow_downward_black_24dp.svg" title="Move layer down">
+                    <img src="/icons/arrow_downward_black_24dp.svg" title="Move layer down">
                 </button>
                 <input id="layer_name_editor" type="text" onchange="Layers.setActiveLayerName(this.value)">
             </div>

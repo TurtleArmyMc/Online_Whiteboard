@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset='utf-8'>
+    <meta http-equiv='X-UA-Compatible' content='IE=edge'>
+    <title>Online Whiteboard</title>
+    <script>
+        const roomRegex = /^[ _]*[A-Za-z0-9][A-Za-z0-9 _]*$/;
+
+        function updateForm() {
+            let roomName = document.getElementById("room_name_textbox").value;
+            let button = document.getElementById("get_room_button");
+            button.disabled = !roomRegex.test(roomName);
+        }
+
+        window.onload = updateForm;
+    </script>
+</head>
+<body>
+    {{ if .Rooms }}
+        <h1>List of rooms</h1>
+        <ul>
+            {{ range .Rooms }}
+                <li>
+                    <a href="/draw/{{ .Name }}">{{ .Name }}</a> - {{ .OnlineUserCount }}
+                </li>
+            {{ end }}
+        </ul>
+    {{ end }}
+    <h1>Create a new room</h1>
+    <form method="GET">
+        <input type="text" name="room_name" id="room_name_textbox" oninput="updateForm()" />
+        <br>
+        <input type="checkbox" name="public" id="public" />
+        <label for="public">Publicly Visible?</label>
+        <br>
+        <input type="submit" id="get_room_button" disabled />
+    </form>
+</body>
+</html>

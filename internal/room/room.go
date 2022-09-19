@@ -15,6 +15,9 @@ import (
 )
 
 type Room struct {
+	name   string
+	public bool
+
 	incomingMessages chan *message
 	connRequests     chan user.ConnectionRequest
 	closeConns       chan user.Connection
@@ -25,8 +28,10 @@ type Room struct {
 	open bool
 }
 
-func New() *Room {
+func newRoom(name string, public bool) *Room {
 	room := &Room{
+		name,
+		public,
 		make(chan *message, 256),
 		make(chan user.ConnectionRequest, 8),
 		make(chan user.Connection, 8),
@@ -38,6 +43,10 @@ func New() *Room {
 	go room.handleEvents()
 
 	return room
+}
+
+func (room *Room) Name() string {
+	return room.name
 }
 
 func (room *Room) WsHandler(writer http.ResponseWriter, req *http.Request, session user.Session) {
@@ -160,7 +169,7 @@ func (room *Room) removeConnection(c user.Connection) {
 		}
 	}
 	if room.users.ConnectionCount() == 0 {
-		// TODO: Remove room when empty
+		delete(rooms, UrlName(room.name))
 	}
 }
 
