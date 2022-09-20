@@ -22,7 +22,7 @@ func newTextLayer(id layer.Id, owner user.Id) layer.Layer {
 			LayerOwner: owner,
 			LayerName:  fmt.Sprintf("Text Layer %d", id),
 		},
-		textInfo{canvas.Width / 2, canvas.Height / 2, 12, "Text"},
+		textInfo{canvas.Width / 2, canvas.Height / 2, 30, "Text"},
 	}
 }
 
