@@ -48,7 +48,7 @@ body {
 #canvas_display canvas {
     position: absolute;
     max-width: min(80vw, 1920px);
-    cursor: crosshair;
+    cursor: none;
     border: 1px;
     border-color: black;
     border-style: solid;

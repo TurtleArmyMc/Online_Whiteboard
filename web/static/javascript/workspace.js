@@ -108,6 +108,7 @@ class PaintLayer {
     showLayerControls() {
         if (this.owner === LocalUserId) {
             document.getElementById("paint_layer_controls").style.display = "block";
+            document.getElementById("hud").style.cursor = "none"; // Use custom circle cursor
             CurrentTool = Tools[document.getElementById("paint_tool_select").value];
         }
     }
@@ -179,6 +180,7 @@ class TextLayer {
     showLayerControls() {
         if (this.owner === LocalUserId) {
             document.getElementById("text_layer_controls").style.display = "block";
+            document.getElementById("hud").style.cursor = "move";
             CurrentTool = Tools.MOVE;
             this.updateTextLayerControls();
         }
@@ -316,11 +318,14 @@ const Layers = {
     },
 
     updateControls: function () {
+        HUD.clear();
+
         // Hide layer controls
         [...document.getElementsByClassName("layer_controls")].forEach(e => e.style.removeProperty("display"));
 
         if (this.activeLayer === null || this.activeLayer.owner != LocalUserId) {
             CurrentTool = null;
+            document.getElementById("hud").style.cursor = "auto"; // Use mouse for canvas cursor
         }
         if (this.activeLayer != null) {
             // Show generic layer controls
@@ -366,6 +371,8 @@ const Layers = {
         let canvasDisplay = document.getElementById("canvas_display");
         // Topmost children must come last
         canvasDisplay.replaceChildren(...this.layers.map(layer => layer.canvas).reverse());
+        // Put HUD on top
+        canvasDisplay.appendChild(HUD.canvas);
 
         let layerSelector = document.getElementById("layer_list");
         layerSelector.replaceChildren(...this.layers.map(layer => new LayerSelector(layer).htmlElement));
@@ -493,6 +500,40 @@ Layers.addLayerChangeCallback(Layers.displayLayers.bind(Layers));
 // Layers selectors must be redrawn to display owner names correctly when a
 // name is changed
 Usernames.addNameChangeCallback(Layers.displayLayers.bind(Layers));
+
+// Displayed on top of all layers for custom cursor
+const HUD = {
+    canvas: document.createElement("canvas"),
+    _dirtyX: 0,
+    _dirtyY: 0,
+    _dirtyWidth: 0,
+    _dirtyHeight: 0,
+
+    clear: function () {
+        if (this._dirtyWidth == 0 || this._dirtyHeight == 0) return;
+        this.canvas.getContext("2d").clearRect(this._dirtyX, this._dirtyY, this._dirtyWidth, this._dirtyHeight);
+        this._dirtyWidth = 0;
+        this._dirtyHeight = 0;
+    },
+
+    drawCircle: function (x, y, radius) {
+        this.clear();
+
+        let ctx = this.canvas.getContext("2d");
+        const circleWidth = 1;
+        ctx.lineWidth = circleWidth;
+        ctx.beginPath();
+        ctx.arc(x, y, radius, 0, 2 * Math.PI);
+        ctx.stroke();
+        this._dirtyX = x - radius - circleWidth;
+        this._dirtyY = y - radius - circleWidth;
+        this._dirtyWidth = 2 * (radius + circleWidth);
+        this._dirtyHeight = 2 * (radius + circleWidth);
+    }
+};
+HUD.canvas.id = "hud";
+HUD.canvas.width = CANVAS_WIDTH;
+HUD.canvas.height = CANVAS_HEIGHT;
 
 /** @type {WebSocket} */
 var Socket;
@@ -752,10 +793,19 @@ class Brush {
     }
 
     /** @param {MouseEvent} e */
+    onmouseleave(e) {
+        HUD.clear();
+    }
+
+    /** @param {MouseEvent} e */
     onmousemove(e) {
+        let pos = getCanvasPos(e, Layers.activeLayer.canvas);
+
+        // Draw brush cursor
+        HUD.drawCircle(pos.x, pos.y, Brush.SIZE / 2);
+
         let mouseDown = !!(e.buttons & 1);
         if (mouseDown) {
-            let pos = getCanvasPos(e, Layers.activeLayer.canvas);
             if (pos != null) {
                 this.drawLine(
                     pos.x - pos.movementX,
