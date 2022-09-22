@@ -68,9 +68,9 @@
                 </div>
 
                 <p>Tool:</p>
-                <select id="paint_tool_select" onchange="CurrentTool = Tools[this.value]">
-                    <option value="PEN">Pen</option>
-                    <option value="ERASER">Eraser</option>
+                <select id="paint_tool_select" onchange="Tools.setCurrent(Tools.tool[this.value])">
+                    <option value="pen">Pen</option>
+                    <option value="eraser">Eraser</option>
                 </select>
             </div>
 

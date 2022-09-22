@@ -108,8 +108,7 @@ class PaintLayer {
     showLayerControls() {
         if (this.owner === LocalUserId) {
             document.getElementById("paint_layer_controls").style.display = "block";
-            document.getElementById("hud").style.cursor = "none"; // Use custom circle cursor
-            CurrentTool = Tools[document.getElementById("paint_tool_select").value];
+            Tools.setCurrent(Tools.tool[document.getElementById("paint_tool_select").value]);
         }
     }
 
@@ -180,8 +179,7 @@ class TextLayer {
     showLayerControls() {
         if (this.owner === LocalUserId) {
             document.getElementById("text_layer_controls").style.display = "block";
-            document.getElementById("hud").style.cursor = "move";
-            CurrentTool = Tools.MOVE;
+            Tools.setCurrent(Tools.tool.move);
             this.updateTextLayerControls();
         }
     }
@@ -324,8 +322,7 @@ const Layers = {
         [...document.getElementsByClassName("layer_controls")].forEach(e => e.style.removeProperty("display"));
 
         if (this.activeLayer === null || this.activeLayer.owner != LocalUserId) {
-            CurrentTool = null;
-            document.getElementById("hud").style.cursor = "auto"; // Use mouse for canvas cursor
+            Tools.setCurrent(null);
         }
         if (this.activeLayer != null) {
             // Show generic layer controls
@@ -782,6 +779,11 @@ class Brush {
         Layers.activeLayer.drawLine(x1, y1, x2, y2);
     }
 
+    onSelect() {
+        // Use custom circle cursor
+        document.getElementById("hud").style.cursor = "none";
+    }
+
     onmousedown(e) {
         let pos = getCanvasPos(e, Layers.activeLayer.canvas);
         if (pos != null) this.drawDot(pos.x, pos.y);
@@ -821,6 +823,10 @@ class Brush {
 Brush.updateSettings();
 
 const MoveTool = {
+    onSelect() {
+        document.getElementById("hud").style.cursor = "move";
+    },
+
     /** @param {MouseEvent} e */
     onmousemove(e) {
         let mouseDown = !!(e.buttons & 1);
@@ -833,19 +839,35 @@ const MoveTool = {
 
 // Tools are used to handle how mouse events should affect the canvas
 const Tools = {
-    PEN: new Brush(),
-    ERASER: new Brush("destination-out"),
-    MOVE: MoveTool,
-};
+    tool: {
+        pen: new Brush(),
+        eraser: new Brush("destination-out"),
+        move: MoveTool,
+    },
 
-// The global current tool. Initialized from tool dropdown chooser
-var CurrentTool = null;
+    // Initialized from tool dropdown chooser
+    _current: null,
+
+    setCurrent: function (tool) {
+        this._current = tool;
+        if (tool == null) {
+            // Use mouse for canvas cursor
+            document.getElementById("hud").style.cursor = "auto";
+        } else if (tool.onSelect) {
+            tool.onSelect();
+        }
+    },
+
+    getCurrent: function () {
+        return this._current;
+    }
+};
 
 // Create handlers to call current tool functions on mouse events
 {
     let canvasDisplay = document.getElementById("canvas_display");
-    canvasDisplay.onmousedown = (e) => CurrentTool && CurrentTool.onmousedown && CurrentTool.onmousedown(e);
-    canvasDisplay.onmouseup = (e) => CurrentTool && CurrentTool.onmouseup && CurrentTool.onmouseup(e);
-    canvasDisplay.onmouseleave = (e) => CurrentTool && CurrentTool.onmouseleave && CurrentTool.onmouseleave(e);
-    canvasDisplay.onmousemove = (e) => CurrentTool && CurrentTool.onmousemove && CurrentTool.onmousemove(e);
+    canvasDisplay.onmousedown = (e) => Tools.getCurrent() && Tools.getCurrent().onmousedown && Tools.getCurrent().onmousedown(e);
+    canvasDisplay.onmouseup = (e) => Tools.getCurrent() && Tools.getCurrent().onmouseup && Tools.getCurrent().onmouseup(e);
+    canvasDisplay.onmouseleave = (e) => Tools.getCurrent() && Tools.getCurrent().onmouseleave && Tools.getCurrent().onmouseleave(e);
+    canvasDisplay.onmousemove = (e) => Tools.getCurrent() && Tools.getCurrent().onmousemove && Tools.getCurrent().onmousemove(e);
 }
