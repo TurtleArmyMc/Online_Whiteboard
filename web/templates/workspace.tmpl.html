@@ -67,11 +67,18 @@
                     <input type="range" min="1" max="200" value="15" id="brush_size" oninput="Brush.updateSettings()">
                 </div>
 
-                <p>Tool:</p>
-                <select id="paint_tool_select" onchange="Tools.setCurrent(Tools.tool[this.value])">
-                    <option value="pen">Pen</option>
-                    <option value="eraser">Eraser</option>
-                </select>
+                <input type="radio" class="paint_tool_select" oninput="Tools.setCurrent(Tools.tool[this.value])"
+                    id="pen_radio" name="paint_tool_select" value="pen" checked
+                >
+                <label for="pen_radio" class="paint_tool_select">
+                    <img src="/icons/brush_black_24dp.svg">
+                </label>
+                <input type="radio" class="paint_tool_select" oninput="Tools.setCurrent(Tools.tool[this.value])"
+                    id="eraser_radio" name="paint_tool_select" value="eraser"
+                >
+                <label for="eraser_radio" class="paint_tool_select">
+                    <img src="/icons/eraser_variant_black_24dp.svg">
+                </label>
             </div>
 
             <div id="text_layer_controls" class="layer_controls">

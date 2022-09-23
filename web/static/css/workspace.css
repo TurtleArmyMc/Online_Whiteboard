@@ -123,3 +123,26 @@ body {
 .layer_controls {
     display: none;
 }
+
+input.paint_tool_select {
+    display: none;
+}
+
+label.paint_tool_select {
+    display: inline-block;
+
+    width: 2em;
+    height: 1.8em;
+    padding-top: 0.2em;
+    border-radius: 0.7em;
+    border-width: 1px;
+    border-style: solid;
+    border-color: transparent;
+
+    text-align: center;
+}
+
+input.paint_tool_select:checked+label {
+    background-color: lightgray;
+    border-color: gray;
+}

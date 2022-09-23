@@ -108,7 +108,13 @@ class PaintLayer {
     showLayerControls() {
         if (this.owner === LocalUserId) {
             document.getElementById("paint_layer_controls").style.display = "block";
-            Tools.setCurrent(Tools.tool[document.getElementById("paint_tool_select").value]);
+            // Set current tool to currently selected paint tool
+            for (let radio of document.getElementsByName("paint_tool_select")) {
+                if (radio.checked) {
+                    Tools.setCurrent(Tools.tool[radio.value]);
+                    break;
+                }
+            }
         }
     }
 
