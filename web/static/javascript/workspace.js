@@ -743,6 +743,9 @@ const getCanvasPos = function (e, canvas) {
     };
 }
 
+/** @param {MouseEvent} e */
+const leftMouseDown = (e) => !!(e.buttons & 1);
+
 // A generic brush for editing paint layers
 class Brush {
     /** @param {string} [compositeOperation=source-over] */
@@ -791,11 +794,13 @@ class Brush {
     }
 
     onmousedown(e) {
+        if (!leftMouseDown(e)) return;
         let pos = getCanvasPos(e, Layers.activeLayer.canvas);
         if (pos != null) this.drawDot(pos.x, pos.y);
     }
 
     onmouseup(e) {
+        if (!leftMouseDown(e)) return;
         let pos = getCanvasPos(e, Layers.activeLayer.canvas);
         if (pos != null) this.drawDot(pos.x, pos.y);
     }
@@ -812,8 +817,7 @@ class Brush {
         // Draw brush cursor
         HUD.drawCircle(pos.x, pos.y, Brush.SIZE / 2);
 
-        let mouseDown = !!(e.buttons & 1);
-        if (mouseDown) {
+        if (leftMouseDown(e)) {
             if (pos != null) {
                 this.drawLine(
                     pos.x - pos.movementX,
@@ -835,8 +839,7 @@ const MoveTool = {
 
     /** @param {MouseEvent} e */
     onmousemove(e) {
-        let mouseDown = !!(e.buttons & 1);
-        if (mouseDown && Layers.activeLayer instanceof TextLayer && Layers.activeLayer.owner === LocalUserId) {
+        if (leftMouseDown(e) && Layers.activeLayer instanceof TextLayer && Layers.activeLayer.owner === LocalUserId) {
             let move = getCanvasPos(e, Layers.activeLayer.canvas);
             Layers.activeLayer.move(move.movementX, move.movementY);
         }
