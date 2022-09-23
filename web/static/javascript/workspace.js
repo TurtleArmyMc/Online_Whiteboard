@@ -103,6 +103,13 @@ class PaintLayer {
         this.canvas.height = CANVAS_HEIGHT;
 
         this.displayIconUrl = "/icons/palette_black_24dp.svg";
+
+        /** @type {[PaintLayerEdit]} */
+        this._undoStack = [];
+        /** @type {[PaintLayerEdit]} */
+        this._redoStack = [];
+        /** @type {?PaintLayerEditBuilder} */
+        this._currentEdit = null;
     }
 
     showLayerControls() {
@@ -119,30 +126,17 @@ class PaintLayer {
     }
 
     drawLine(x1, y1, x2, y2) {
-        /** @type {CanvasRenderingContext2D} */
-        let ctx = this.canvas.getContext("2d");
+        // Clear redo stack when making a new change
+        this._redoStack = [];
 
+        let ctx = this.canvas.getContext("2d");
         ctx.beginPath();
         ctx.moveTo(x1, y1);
         ctx.lineTo(x2, y2);
         ctx.stroke();
-
-        let minX = Math.min(x1, x2);
-        let minY = Math.min(y1, y2);
-        let maxX = Math.max(x1, x2);
-        let maxY = Math.max(y1, y2);
-
-        // Gives the rectangle enough padding to contain the
-        // whole edit, while not being excessively big at the same time
-        this.sendDrawPacket(
-            minX - (ctx.lineWidth / 1.8) - 2,
-            minY - (ctx.lineWidth / 1.8) - 2,
-            maxX + (ctx.lineWidth / 1.8) + 2,
-            maxY + (ctx.lineWidth / 1.8) + 2
-        );
     }
 
-    sendDrawPacket(minX, minY, maxX, maxY) {
+    sendRectDraw(minX, minY, maxX, maxY) {
         // Make sure coords are within bounds
         minX = Math.max(Math.floor(minX), 0);
         minY = Math.max(Math.floor(minY), 0);
@@ -151,20 +145,147 @@ class PaintLayer {
 
         let width = maxX - minX + 1;
         let height = maxY - minY + 1;
-        let ctx = this.canvas.getContext("2d");
-        let imgData = ctx.getImageData(minX, minY, width, height);
-        let packet = {
+        let imgData = this.canvas.getContext("2d").getImageData(minX, minY, width, height);
+        PaintLayer.sendDrawPacket(this.id, imgData, minX, minY);
+    }
+
+    static sendDrawPacket(id, imgData, x, y) {
+        return Socket.send(JSON.stringify({
             "type": PACKET_PAINT_LAYER_DRAW,
             "data": {
-                "pos": { "x": minX, "y": minY },
+                "pos": { "x": x, "y": y },
                 "image": encodeImageData(imgData),
-                "layer": this.id,
+                "layer": id,
             },
-        };
-        Socket.send(JSON.stringify(packet));
+        }));
+    }
+
+    static MAX_HISTORY = 15; // The maximum number of saved undo/redo edits
+
+    undo() {
+        let edit = null;
+        if (this._currentEdit) {
+            edit = this._currentEdit.build();
+            this._currentEdit = null;
+        }
+        if (!edit) edit = this._undoStack.pop();
+
+        if (!edit) return;
+        this._redoStack.push(edit.getReverse());
+        if (this._redoStack.length > PaintLayer.MAX_HISTORY) {
+            this._redoStack = this._redoStack.slice(1, MAX_UNDO + 1);
+        }
+        edit.applyEdit();
+    }
+
+    redo() {
+        let edit = this._redoStack.pop();
+        if (!edit) return;
+        this._undoStack.push(edit.getReverse());
+        if (this._undoStack.length > PaintLayer.MAX_HISTORY) {
+            this._undoStack = this._undoStack.slice(1, MAX_UNDO + 1);
+        }
+        edit.applyEdit();
+    }
+
+    startEdit() {
+        if (this._currentEdit === null) this._currentEdit = new PaintLayerEditBuilder(this);
+    }
+
+    updateEditBounds(x1, x2, y1, y2) {
+        this.startEdit(); // Start edit if one isn't in progress
+        this._currentEdit.updateBounds(x1, x2, y1, y2);
+    }
+
+    finishEdit() {
+        if (this._currentEdit === null) return;
+        let edit = this._currentEdit.build();
+        this._currentEdit = null;
+        if (edit === null) return;
+        if (this._undoStack.length >= PaintLayer.MAX_HISTORY) {
+            this._undoStack = this._undoStack.slice(1, PaintLayer.MAX_HISTORY + 1);
+        }
+        this._undoStack.push(edit);
+    }
+
+    clearEditHistory() {
+        this._undoStack = [];
+        this._redoStack = [];
     }
 
     static type = "paint_layer";
+}
+
+// Keeps track of canvas before the current edit made to allow for undoing
+// changes
+class PaintLayerEditBuilder {
+    /** @argument {PaintLayer} layer */
+    constructor(layer) {
+        this.layer = layer;
+        this.xMin = layer.canvas.width;
+        this.yMin = layer.canvas.height;
+        this.xMax = 0;
+        this.yMax = 0;
+
+        this.canvas = document.createElement("canvas");
+        this.canvas.width = layer.canvas.width;
+        this.canvas.height = layer.canvas.height;
+        let ctx = this.canvas.getContext("2d");
+        ctx.drawImage(layer.canvas, 0, 0);
+    }
+
+    updateBounds(x1, y1, x2, y2) {
+        this.xMin = Math.min(this.xMin, x1, x2);
+        this.xMax = Math.max(this.xMax, x1, x2);
+        this.yMin = Math.min(this.yMin, y1, y2);
+        this.yMax = Math.max(this.yMax, y1, y2);
+    }
+
+    /** @returns {?PaintLayerEdit} */
+    build() {
+        if (this.xMax <= 0 || this.yMax <= 0) return null;
+        if (this.layer.canvas.width <= this.xMin || this.layer.canvas.height <= this.yMin) return null;
+        this.xMin = Math.max(Math.floor(this.xMin), 0);
+        this.yMin = Math.max(Math.floor(this.yMin), 0);
+        this.xMax = Math.min(Math.ceil(this.xMax), CANVAS_WIDTH - 1);
+        this.yMax = Math.min(Math.ceil(this.yMax), CANVAS_HEIGHT - 1);
+        let width = this.xMax - this.xMin + 1;
+        let height = this.yMax - this.yMin + 1;
+        let imgData = this.canvas.getContext("2d").getImageData(this.xMin, this.yMin, width, height);
+        return new PaintLayerEdit(this.layer, imgData, this.xMin, this.yMin, width, height);
+    }
+}
+
+// A snapshot of what a section of a layer was like before a change to allow
+// for undoing/redoing it
+class PaintLayerEdit {
+    /** @argument {PaintLayer} layer */
+    /** @argument {PaintLayerEdit} [reverse] */
+    constructor(layer, imgData, x, y, width, height, reverse) {
+        this.layer = layer;
+        this.imgData = imgData;
+        this.x = x;
+        this.y = y;
+        this.width = width;
+        this.height = height;
+
+        this._reverse = reverse;
+    }
+
+    applyEdit() {
+        this.layer.canvas.getContext("2d").putImageData(this.imgData, this.x, this.y);
+        PaintLayer.sendDrawPacket(this.layer.id, this.imgData, this.x, this.y);
+    }
+
+    // Creates a new PaintLayerEdit for the dimensions this edit covers. This
+    // allows for quickly creating "redo" edits
+    getReverse() {
+        if (this._reverse === undefined) {
+            let imgData = this.layer.canvas.getContext("2d").getImageData(this.x, this.y, this.width, this.height);
+            this._reverse = new PaintLayerEdit(this.layer, imgData, this.x, this.y, this.width, this.height, this);
+        }
+        return this._reverse;
+    }
 }
 
 class TextLayer {
@@ -319,6 +440,7 @@ const Layers = {
     setActiveLayer: function (layer) {
         this.activeLayer = layer;
         this.updateControls();
+        HUD.canvas.focus(); // Focus hud to listen for keyboard shortcuts
     },
 
     updateControls: function () {
@@ -506,7 +628,8 @@ Usernames.addNameChangeCallback(Layers.displayLayers.bind(Layers));
 
 // Displayed on top of all layers for custom cursor
 const HUD = {
-    canvas: document.createElement("canvas"),
+    /** @type {HTMLCanvasElement} */
+    canvas: document.getElementById("hud"),
     _dirtyX: 0,
     _dirtyY: 0,
     _dirtyWidth: 0,
@@ -534,9 +657,6 @@ const HUD = {
         this._dirtyHeight = 2 * (radius + circleWidth);
     }
 };
-HUD.canvas.id = "hud";
-HUD.canvas.width = CANVAS_WIDTH;
-HUD.canvas.height = CANVAS_HEIGHT;
 
 /** @type {WebSocket} */
 var Socket;
@@ -654,6 +774,7 @@ const S2CPacketHandlers = {
 
     [PACKET_PAINT_LAYER_SET]: data => {
         let layer = Layers.getChecked(data.layer, PaintLayer);
+        layer.clearEditHistory(); // Edit history is invalid if last changed by server
         let imageData = decodeImageData(data.image);
         let ctx = layer.canvas.getContext("2d");
         ctx.putImageData(imageData, 0, 0);
@@ -661,6 +782,7 @@ const S2CPacketHandlers = {
 
     [PACKET_PAINT_LAYER_DRAW]: data => {
         let layer = Layers.getChecked(data.layer, PaintLayer);
+        layer.clearEditHistory(); // Edit history is invalid if last changed by server
         let imageData = decodeImageData(data.image);
         let ctx = layer.canvas.getContext("2d");
         ctx.putImageData(imageData, data.pos.x, data.pos.y);
@@ -775,10 +897,10 @@ class Brush {
     drawLine(x1, y1, x2, y2) {
         if (!(Layers.activeLayer instanceof PaintLayer)) return;
         if (Layers.activeLayer.owner != LocalUserId) return;
+        // Start a new edit if one isn't already in progress
+        Layers.activeLayer.startEdit();
 
-        /** @type {CanvasRenderingContext2D} */
         let ctx = Layers.activeLayer.canvas.getContext("2d");
-
         // Set canvas settings before draw
         ctx.globalCompositeOperation = this.compositeOperation;
         ctx.strokeStyle = Brush.COLOR;
@@ -786,6 +908,15 @@ class Brush {
         ctx.lineCap = "round";
 
         Layers.activeLayer.drawLine(x1, y1, x2, y2);
+
+        // Give the rectangle enough padding to contain the
+        // whole edit, while not being excessively big at the same time
+        let minX = Math.min(x1, x2) - (Brush.SIZE / 1.8) - 2;
+        let minY = Math.min(y1, y2) - (Brush.SIZE / 1.8) - 2;
+        let maxX = Math.max(x1, x2) + (Brush.SIZE / 1.8) + 2;
+        let maxY = Math.max(y1, y2) + (Brush.SIZE / 1.8) + 2;
+        Layers.activeLayer.updateEditBounds(minX, minY, maxX, maxY);
+        Layers.activeLayer.sendRectDraw(minX, minY, maxX, maxY);
     }
 
     onSelect() {
@@ -793,16 +924,19 @@ class Brush {
         document.getElementById("hud").style.cursor = "none";
     }
 
+    /** @param {MouseEvent} e */
     onmousedown(e) {
         if (!leftMouseDown(e)) return;
         let pos = getCanvasPos(e, Layers.activeLayer.canvas);
         if (pos != null) this.drawDot(pos.x, pos.y);
     }
 
+    /** @param {MouseEvent} e */
     onmouseup(e) {
-        if (!leftMouseDown(e)) return;
-        let pos = getCanvasPos(e, Layers.activeLayer.canvas);
-        if (pos != null) this.drawDot(pos.x, pos.y);
+        if (e.button != 0) return; // Only activate for left mouse button
+        if (!(Layers.activeLayer instanceof PaintLayer)) return;
+        if (Layers.activeLayer.owner != LocalUserId) return;
+        Layers.activeLayer.finishEdit();
     }
 
     /** @param {MouseEvent} e */
@@ -825,6 +959,20 @@ class Brush {
                     pos.x,
                     pos.y
                 );
+            }
+        }
+    }
+
+    /** @param {KeyboardEvent} e */
+    onkeydown(e) {
+        if (e.ctrlKey && (e.key === 'z' || e.key === 'Z')) {
+            if (!(Layers.activeLayer instanceof PaintLayer)) return;
+            if (Layers.activeLayer.owner != LocalUserId) return;
+
+            if (e.shiftKey) {
+                Layers.activeLayer.redo();
+            } else {
+                Layers.activeLayer.undo();
             }
         }
     }
@@ -873,10 +1021,11 @@ const Tools = {
 };
 
 // Create handlers to call current tool functions on mouse events
-{
-    let canvasDisplay = document.getElementById("canvas_display");
-    canvasDisplay.onmousedown = (e) => Tools.getCurrent() && Tools.getCurrent().onmousedown && Tools.getCurrent().onmousedown(e);
-    canvasDisplay.onmouseup = (e) => Tools.getCurrent() && Tools.getCurrent().onmouseup && Tools.getCurrent().onmouseup(e);
-    canvasDisplay.onmouseleave = (e) => Tools.getCurrent() && Tools.getCurrent().onmouseleave && Tools.getCurrent().onmouseleave(e);
-    canvasDisplay.onmousemove = (e) => Tools.getCurrent() && Tools.getCurrent().onmousemove && Tools.getCurrent().onmousemove(e);
-}
+HUD.canvas.onmousedown = (e) => Tools.getCurrent() && Tools.getCurrent().onmousedown && Tools.getCurrent().onmousedown(e);
+HUD.canvas.onmouseup = (e) => Tools.getCurrent() && Tools.getCurrent().onmouseup && Tools.getCurrent().onmouseup(e);
+HUD.canvas.onmouseleave = (e) => Tools.getCurrent() && Tools.getCurrent().onmouseleave && Tools.getCurrent().onmouseleave(e);
+HUD.canvas.onmousemove = (e) => {
+    HUD.canvas.focus(); // Focus hud to listen for keyboard shortcuts
+    Tools.getCurrent() && Tools.getCurrent().onmousemove && Tools.getCurrent().onmousemove(e);
+};
+HUD.canvas.onkeydown = (e) => Tools.getCurrent() && Tools.getCurrent().onkeydown && Tools.getCurrent().onkeydown(e);

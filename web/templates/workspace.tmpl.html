@@ -16,7 +16,10 @@
         </div>
     </div>
     <div id="main_content">
-        <div id="canvas_display"></div>
+        <div id="canvas_display">
+            <!-- tabindex allows hud to respond to keydown event -->
+            <canvas id="hud" width="1920" height="1080" tabindex="-1"></canvas>
+        </div>
         <div id="sidebar">
             <div id="layer_manager">
                 <img src="/icons/add_circle_black_24dp.svg">
