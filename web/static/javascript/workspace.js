@@ -637,7 +637,7 @@ const HUD = {
 
     clear: function () {
         if (this._dirtyWidth == 0 || this._dirtyHeight == 0) return;
-        this.canvas.getContext("2d").clearRect(this._dirtyX, this._dirtyY, this._dirtyWidth, this._dirtyHeight);
+        this.canvas.getContext("2d").clearRect(this._dirtyX - 1, this._dirtyY - 1, this._dirtyWidth + 2, this._dirtyHeight + 2);
         this._dirtyWidth = 0;
         this._dirtyHeight = 0;
     },
